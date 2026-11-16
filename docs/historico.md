@@ -22,6 +22,9 @@ O `publish` não copia o JSON publicado para o `history.json`: grava a **mescla 
 - Dry-run e `export` mostram `PERDA DE HISTÓRICO` com antes -> depois, dias removidos e a causa provável (`--no-history`, `--since`, `--tool`, `history:false`).
 - `publish` manual em terminal: exige digitar exatamente `publicar com perda de histórico`. Sem terminal: exige `--accept-history-loss`.
 - `run` agendado (`autoPublish`): **bloqueia** e explica; a aprovação automática nunca cobre perda de histórico.
+- A referência é **normalizada** como a mescla faz: datas fora de 2000-01-01..amanhã e ferramentas fora do registro atual são descartadas antes de comparar (senão uma ferramenta desconhecida ou um relógio adiantado em outro computador travariam o agendador para sempre). Com a série já cortada em 4000 pontos, datas da referência mais antigas que o primeiro ponto do plano não contam como removidas e os totais são comparados só dentro da janela.
+- Sem referência utilizável (remoto sem `metrics.json`, inválido, acima de 5 MiB, ou baseline incoerente sem clone): a guarda **não bloqueia**, mas o dry-run, o `export` e o envio avisam "sem referência válida para comparar".
+- O `history.json` monotônico descarta ferramentas fora do registro atual ao regravar; a promessa "nunca encolhe" vale para as ferramentas do registro atual. Um `history.json` ilegível nunca é sobrescrito sem aviso.
 - A guarda também vale quando o baseline foi ignorado (inválido, incoerente): o `anterior` do clone/remoto continua sendo comparado.
 
 ## Validação do baseline (entrada não confiável)
@@ -74,7 +77,7 @@ Com o mesmo baseline e os mesmos registros o JSON é o mesmo (exceto `generatedA
 
 ## `restore` (computador novo)
 
-Se já existe `history.json`, o restaurado **não o sobrescreve**: grava-se a mescla por máximo e a comparação (dias e totais, local atual / restaurado / resultado) é mostrada; `restore --from-file` pede confirmação (`[s/N]` ou `--yes`) nesse caso, e o restore pela rede já pediu a confirmação antes de baixar. `restore --from-file` recusa caminhos de rede no Windows (`\\\\host\\pasta`, `//host/pasta`, `\\\\?\\`, `\\\\.\\`).
+Se já existe `history.json`, o restaurado **não o sobrescreve**: grava-se a mescla por máximo e a comparação (dias e totais, local atual / restaurado / resultado) é mostrada; `restore --from-file` pede confirmação (`[s/N]` ou `--yes`) nesse caso, e o restore pela rede já pediu a confirmação antes de baixar. `restore --from-file` recusa caminhos de rede no Windows (UNC como `\\host\pasta`, `//host/pasta`, e os prefixos `\\?\` e `\\.\`).
 
 
 `restore` baixa o último `metrics.json` do repositório de dados e o grava como `history.json`, depois da validação estrita. É rede: pede confirmação (`[s/N]` em terminal ou `--yes`) e usa a mesma maquinaria do `publish` (remoto validado, ambiente do git por allowlist, protocolos permitidos, clone marcado, `cwd` explícito, sem hooks, sem token); só lê, nunca faz commit nem push. `restore --from-file <json>` é 100% offline e valida do mesmo jeito. Repositório vazio ou sem `metrics.json`: diz isso e não grava nada.
