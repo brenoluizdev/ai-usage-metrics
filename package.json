@@ -3,8 +3,14 @@
   "version": "0.1.0",
   "description": "Mede localmente o uso das suas ferramentas de IA e publica um SVG/JSON agregado e anonimizado no seu próprio repositório. Sem servidor, sem IA no meio.",
   "type": "module",
-  "private": true,
   "license": "MIT",
+  "author": {
+    "name": "Breno Luiz",
+    "url": "https://github.com/brenoluizdev"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/brenoluizdev/ai-usage-metrics.git"

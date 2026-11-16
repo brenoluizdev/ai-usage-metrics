@@ -409,7 +409,7 @@ test("svg/schema: ids como constructor e __proto__ não viram propriedades herda
   assert.equal(validarMetricas(ruim2).ok, false);
 });
 
-test("template do Actions: ações fixadas por SHA de commit (com a tag em comentário), versão do pacote como TODO e branches ligada à config", async () => {
+test("template do Actions: ações fixadas por SHA de commit (com a tag em comentário), versão do pacote fixa e branches ligada à config", async () => {
   const y = await readFile(new URL("../templates/github-actions/render-svg.yml", import.meta.url), "utf8");
   // SHAs resolvidos com `git ls-remote` em 2026-11-15 (tags v4.2.2 e v4.1.0, ambas leves: apontam direto para o commit).
   assert.match(y, /uses: actions\/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4\.2\.2/);
@@ -418,6 +418,8 @@ test("template do Actions: ações fixadas por SHA de commit (com a tag em comen
   const usos = [...y.matchAll(/uses:\s*(\S+)/g)].map((m) => m[1]);
   assert.ok(usos.length >= 2);
   for (const u of usos) assert.match(u, /@[0-9a-f]{40}$/, `ação sem SHA fixo: ${u}`);
-  assert.match(y, /AI_USAGE_METRICS_VERSION: "0\.0\.0-TODO"/);
+  // A versão do pacote no template precisa ser uma versão fixa (semver exato), igual à do package.json.
+  const versaoPkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")).version;
+  assert.match(y, new RegExp(`AI_USAGE_METRICS_VERSION: "${versaoPkg.replace(/\./g, "\\.")}"`));
   assert.match(y, /branches: \[main\][^\n]*TODO[^\n]*branch/);
 });

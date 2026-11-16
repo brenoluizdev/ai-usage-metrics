@@ -41,7 +41,20 @@ Ainda não suportados: Cursor, GitHub Copilot CLI, Gemini/Antigravity, threads d
 
 Requisitos: **Node.js 24 ou mais novo** (usa `node:sqlite`) e **git**.
 
-O pacote ainda não foi publicado no npm. Por enquanto, rode a partir de um clone:
+Rode sem instalar, com `npx`:
+
+```bash
+npx ai-usage-metrics --help
+```
+
+Ou instale globalmente:
+
+```bash
+npm install -g ai-usage-metrics
+ai-usage-metrics --help
+```
+
+Também dá para rodar direto do código-fonte:
 
 ```bash
 git clone https://github.com/brenoluizdev/ai-usage-metrics.git
@@ -49,7 +62,7 @@ cd ai-usage-metrics
 node bin/ai-usage-metrics.mjs --help
 ```
 
-Nos exemplos abaixo, `ai-usage-metrics` significa `node bin/ai-usage-metrics.mjs`.
+Nos exemplos abaixo, `ai-usage-metrics` é o comando instalado. Com `npx`, escreva `npx ai-usage-metrics`; a partir do código-fonte, `node bin/ai-usage-metrics.mjs`.
 
 ## Início rápido
 
@@ -59,6 +72,8 @@ Nos exemplos abaixo, `ai-usage-metrics` significa `node bin/ai-usage-metrics.mjs
    ai-usage-metrics init --user seu-usuario --public meu-site,outro-projeto --lang pt-BR --title "Meu uso de IA"
    ```
    O `init` grava o `config.json` e imprime o trecho de README e as instruções de agendamento.
+
+   **Contas novas do GitHub:** o e-mail de commit padrão (`usuario@users.noreply.github.com`) pode não vincular os commits ao seu perfil. Se isso acontecer, edite o `config.json` e defina `"commitEmail"` com o formato que inclui o ID numérico, `ID+usuario@users.noreply.github.com` (o ID aparece em Settings > Emails, ou em `https://api.github.com/users/seu-usuario`).
 3. Veja o que sairia, sem enviar nada:
    ```bash
    ai-usage-metrics export

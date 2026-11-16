@@ -57,15 +57,12 @@ O commit enviado ao seu repositório público leva um autor e um committer. A fe
   `"commitName": "Seu Nome", "commitEmail": "12345678+seu-usuario@users.noreply.github.com"`.
 - Se a opção "Block command line pushes that expose my email" estiver ligada na sua conta, o GitHub recusa pushes com e-mail privado: use o noreply.
 
-## Checklist de publicação no npm
+## Publicando uma nova versão (mantenedor)
 
-O pacote está com `"private": true` de propósito, para evitar uma publicação acidental. Para publicar:
-
-1. Confirme que o nome `ai-usage-metrics` está livre no npm (ou use um escopo).
-2. Remova `"private": true`.
-3. Rode `npm pack --dry-run` e confira a lista de arquivos (só `bin`, `src`, `docs`, `templates`, `examples`, `LICENSE`, `README.md`, `SECURITY.md` e `package.json`): nada de `.env`, `config.json`, `state.json`, `out/`, `repo/` ou logs.
-4. Ative **2FA** na conta do npm (de preferência exigido para publicar) e publique com `npm publish --provenance`. A proveniência só é gerada a partir de um CI suportado (por exemplo GitHub Actions com `id-token: write`); de uma máquina local o `--provenance` falha, e nesse caso publique sem ele, com 2FA, e registre isso.
-5. Fixe a versão publicada no template do Actions (`AI_USAGE_METRICS_VERSION`). As ações do template já estão fixadas por SHA de commit (resolvidas com `git ls-remote` nas tags `v4.2.2` e `v4.1.0`); ao atualizar uma ação, repita a consulta e troque o SHA.
+1. Rode `npm test` e `npm run lint`.
+2. Rode `npm pack --dry-run` e confira a lista de arquivos (só `bin`, `src`, `docs`, `templates`, `examples`, `LICENSE`, `README.md`, `SECURITY.md` e `package.json`): nada de `.env`, `config.json`, `state.json`, `out/`, `repo/` ou logs.
+3. Publique com **2FA** ativo na conta do npm. O `--provenance` só é gerado a partir de um CI suportado (por exemplo GitHub Actions com `id-token: write`); de uma máquina local ele falha, e nesse caso publica-se sem ele, com 2FA.
+4. Atualize `AI_USAGE_METRICS_VERSION` no template do Actions. As ações do template estão fixadas por SHA de commit (resolvidas com `git ls-remote` nas tags `v4.2.2` e `v4.1.0`); ao atualizar uma ação, repita a consulta e troque o SHA.
 
 ## Riscos que continuam com você
 

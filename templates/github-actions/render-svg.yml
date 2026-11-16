@@ -5,7 +5,7 @@
 # (por exemplo, se você envia só o JSON por outro caminho). Não foi testado em um GitHub real.
 #
 # TODO antes de usar:
-#  - troque AI_USAGE_METRICS_VERSION por uma versão que exista no npm (o pacote ainda não foi publicado);
+#  - AI_USAGE_METRICS_VERSION está fixada na primeira versão publicada no npm; ao atualizar, troque por outra versão existente;
 #  - ajuste tema, título e idioma abaixo para os mesmos valores do seu config.json local;
 #  - as ações abaixo já estão fixadas por SHA de commit (a tag de versão pode ser movida por quem controla o repositório da
 #    ação). Os SHAs foram resolvidos em 2026-11-15 com `git ls-remote` nas tags citadas nos comentários; ao atualizar uma
@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AI_USAGE_METRICS_VERSION: "0.0.0-TODO"
+  AI_USAGE_METRICS_VERSION: "0.1.0"
   THEME: auto
   TITLE: AI usage
   LANG_SVG: en
