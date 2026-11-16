@@ -2,7 +2,7 @@
 // Cada função é pequena, sem shell (execFile com array de argumentos), com ambiente por allowlist, timeout e limite de saída.
 // A saída de programas e da rede é parseada de forma ESTRITA e sanitizada antes de ser mostrada. Nenhum token é lido nem repassado.
 import { execFile } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { request as httpsRequest } from "node:https";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -112,6 +112,7 @@ export function caminhoApiValido(caminho) {
 export function apiGet(caminho, { request = httpsRequest, timeout = 10_000, prazoTotal = 15_000, signal } = {}) {
   return new Promise((resolver) => {
     if (!caminhoApiValido(caminho)) return resolver({ erro: "caminho recusado" });
+    if (signal?.aborted) return resolver({ erro: "cancelado" }); // Ctrl+C já aconteceu: nem abre a conexão
     let fim = false;
     let relogio = null;
     let req;
@@ -160,20 +161,46 @@ export function apiGet(caminho, { request = httpsRequest, timeout = 10_000, praz
   });
 }
 
+const desescapaXml = (s) => s.replace(/&(lt|gt|quot|apos|amp|#\d{1,6}|#x[0-9a-fA-F]{1,5});/g, (m, e) => ({ lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" })[e] ?? String.fromCodePoint(e[1] === "x" ? parseInt(e.slice(2), 16) : Number(e.slice(1))));
+
+/** Primeiro <Exec> do XML da tarefa: "<Command> <Arguments>" desescapado e sanitizado (até 300 caracteres), ou null. */
+export function parsearTarefaXml(texto) {
+  if (typeof texto !== "string" || texto.length > LIMITE_SAIDA) return null;
+  const exec = /<Exec>([\s\S]*?)<\/Exec>/.exec(texto);
+  if (!exec) return null;
+  const pega = (tag) => new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(exec[1])?.[1];
+  const cmd = pega("Command");
+  if (cmd === undefined) return null;
+  const args = pega("Arguments");
+  return limparTexto(desescapaXml(`${cmd}${args ? ` ${args}` : ""}`), 300) || null;
+}
+
+/** Saída de "schtasks /Query /FO LIST /V": procura as chaves conhecidas (localizadas). Sanitizado, até 300 caracteres, ou null. */
+export function parsearTarefaLista(texto) {
+  if (typeof texto !== "string") return null;
+  for (const linha of texto.split(/\r?\n/)) {
+    const m = /^\s*(?:Tarefa a ser executada|Tarefa a Executar|Task To Run)\s*:\s*(.*)$/i.exec(linha);
+    if (m) return limparTexto(m[1], 300) || null;
+  }
+  return null;
+}
+
 /** Funções externas reais. Em testes, o assistente recebe um objeto com a mesma forma. */
-export function externosPadrao({ exec = execFile, request = httpsRequest, plataforma = process.platform } = {}) {
+export function externosPadrao({ exec = execFile, request = httpsRequest, plataforma = process.platform, npmCli = undefined, lerTexto = (p) => readFileSync(p, "utf8") } = {}) {
   const env = ambienteExterno();
   return {
-    async ghUsuario() {
-      const r = await executar("gh", ["api", "user"], { env, exec });
+    async ghUsuario({ signal } = {}) {
+      const r = await executar("gh", ["api", "user"], { env, exec, signal });
+      if (r.cancelado) return { estado: "cancelado" };
       if (r.ausente) return { estado: "ausente" };
       if (!r.ok) return { estado: "sem-login" };
       const u = parsearUsuario(r.stdout);
       return u ? { estado: "ok", ...u } : { estado: "erro" };
     },
-    async ghRepo(usuario, nome) {
+    async ghRepo(usuario, nome, { signal } = {}) {
       if (!usuarioValido(usuario) || !repoValido(nome)) return { estado: "erro" };
-      const r = await executar("gh", ["repo", "view", `${usuario}/${nome}`, "--json", "name,isPrivate"], { env, exec });
+      const r = await executar("gh", ["repo", "view", `${usuario}/${nome}`, "--json", "name,isPrivate"], { env, exec, signal });
+      if (r.cancelado) return { estado: "cancelado" };
       if (r.ausente) return { estado: "ausente" };
       if (!r.ok) return /could not resolve|not found|404/i.test(r.stderr) ? { estado: "inexistente" } : { estado: "erro" };
       const p = parsearRepo(r.stdout, nome);
@@ -184,18 +211,18 @@ export function externosPadrao({ exec = execFile, request = httpsRequest, plataf
       const r = await executar("gh", ["repo", "create", `${usuario}/${nome}`, "--public", "--description", "AI usage metrics (ai-usage-metrics)"], { env, exec, timeout: 60_000, signal });
       return r.ok ? { ok: true } : { ok: false, cancelado: r.cancelado, motivo: limparTexto(r.stderr || "o gh recusou", 160) };
     },
-    async apiUsuario(login) {
+    async apiUsuario(login, { signal } = {}) {
       if (!usuarioValido(login)) return { estado: "erro" };
-      const r = await apiGet(`/users/${login}`, { request });
+      const r = await apiGet(`/users/${login}`, { request, signal });
       if (r.erro) return { estado: "erro", motivo: r.erro };
       if (r.status === 404) return { estado: "inexistente" };
       if (r.status !== 200) return { estado: "erro", motivo: `HTTP ${Number(r.status) || "?"}` };
       const u = parsearUsuario(r.texto, login);
       return u ? { estado: "ok", ...u } : { estado: "erro", motivo: "resposta inesperada" };
     },
-    async apiRepo(usuario, nome) {
+    async apiRepo(usuario, nome, { signal } = {}) {
       if (!usuarioValido(usuario) || !repoValido(nome)) return { estado: "erro" };
-      const r = await apiGet(`/repos/${usuario}/${nome}`, { request });
+      const r = await apiGet(`/repos/${usuario}/${nome}`, { request, signal });
       if (r.erro) return { estado: "erro", motivo: r.erro };
       if (r.status === 404) return { estado: "inexistente" }; // sem login, um repositório PRIVADO também parece inexistente
       if (r.status !== 200) return { estado: "erro", motivo: `HTTP ${Number(r.status) || "?"}` };
@@ -206,12 +233,23 @@ export function externosPadrao({ exec = execFile, request = httpsRequest, plataf
     // ---------- npm (cópia fixa do pacote para o agendador) ----------
     async npmInstalar({ prefixo, versao, signal }) {
       if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(versao)) return { ok: false, motivo: "versão inválida" };
-      const cli = localizarNpmCli();
+      const cli = npmCli === undefined ? localizarNpmCli() : npmCli;
       if (!cli) return { ok: false, motivo: "não encontrei o npm junto do Node" };
       // Registro EXPLÍCITO (o do .npmrc do usuário não decide de onde vem o código que o Agendador vai executar todo dia).
       const r = await executar(process.execPath, [cli, "install", "--prefix", prefixo, `ai-usage-metrics@${versao}`, "--registry", REGISTRO_NPM, "--no-audit", "--no-fund", "--ignore-scripts", "--loglevel=error"], { env, exec, timeout: 180_000, signal });
       if (!r.ok) return { ok: false, cancelado: r.cancelado, motivo: limparTexto(r.stderr || "o npm falhou", 200) };
-      const bin = join(prefixo, "node_modules", "ai-usage-metrics", "bin", "ai-usage-metrics.mjs");
+      const raiz = join(prefixo, "node_modules", "ai-usage-metrics");
+      // Confere O QUE foi instalado: nome e versão do package.json têm de ser exatamente os pedidos.
+      let pacote = null;
+      try {
+        pacote = JSON.parse(lerTexto(join(raiz, "package.json")));
+      } catch {
+        pacote = null;
+      }
+      if (!pacote || pacote.name !== "ai-usage-metrics" || pacote.version !== versao) {
+        return { ok: false, motivo: `o npm instalou outra coisa (${limparTexto(`${pacote?.name}@${pacote?.version}`, 80)}) em vez de ai-usage-metrics@${versao}; a tarefa não será criada` };
+      }
+      const bin = join(raiz, "bin", "ai-usage-metrics.mjs");
       return existsSync(bin) ? { ok: true, bin } : { ok: false, motivo: "a instalação terminou, mas o executável não está onde esperado" };
     },
 
@@ -221,16 +259,17 @@ export function externosPadrao({ exec = execFile, request = httpsRequest, plataf
       const r = await executar("schtasks", ["/Query", "/TN", nome], { env, exec });
       return r.ok;
     },
-    /** "Tarefa a executar" da tarefa existente (texto sanitizado), ou null. A chave é localizada (pt-BR/en), então só as conhecidas valem. */
+    /**
+     * O que a tarefa existente executa (texto sanitizado), ou null. Primeiro o XML (<Exec><Command>/<Arguments>, não depende do idioma do
+     * Windows); se falhar, o formato LIST /V com as chaves conhecidas ("Tarefa a ser executada", "Tarefa a Executar", "Task To Run").
+     */
     async tarefaAtual(nome) {
       if (plataforma !== "win32") return null;
+      const x = await executar("schtasks", ["/Query", "/TN", nome, "/XML"], { env, exec });
+      const doXml = x.ok ? parsearTarefaXml(x.stdout) : null;
+      if (doXml) return doXml;
       const r = await executar("schtasks", ["/Query", "/TN", nome, "/FO", "LIST", "/V"], { env, exec });
-      if (!r.ok) return null;
-      for (const linha of r.stdout.split(/\r?\n/)) {
-        const m = /^\s*(?:Tarefa a Executar|Task To Run)\s*:\s*(.*)$/i.exec(linha);
-        if (m) return limparTexto(m[1], 300) || null;
-      }
-      return null;
+      return r.ok ? parsearTarefaLista(r.stdout) : null;
     },
     async criarTarefa({ nome, horario, tr, substituir, signal }) {
       if (plataforma !== "win32") return { ok: false, motivo: "só no Windows" };

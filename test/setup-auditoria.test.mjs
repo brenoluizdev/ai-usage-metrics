@@ -114,7 +114,9 @@ test("M2: Ctrl+C durante o npm install aborta o filho, não cria a tarefa e diz 
   assert.equal(r.erro, undefined);
   assert.ok(sinalVisto?.aborted, "o AbortSignal chegou ao npm");
   assert.equal(chamadas.some((c) => c[0] === "criarTarefa"), false, "a ação seguinte NÃO executa");
-  assert.match(r.texto, /Interrompido \(Ctrl\+C\)\. Já feito: gravar a configuração\. NÃO executado: npm install da cópia fixa; criar a tarefa agendada/);
+  assert.match(r.texto, /Interrompido \(Ctrl\+C\)\. Já feito: gravar a configuração\./);
+  assert.match(r.texto, /Interrompida durante: npm install da cópia fixa/);
+  assert.match(r.texto, /NÃO executado: criar a tarefa agendada/);
   assert.match(r.texto, /JÁ tinha sido gravada/);
   assert.ok(existsSync(a.config), "a configuração foi gravada antes");
   assert.equal(existsSync(join(a.estado, ".lock")), false, "o lock foi liberado");
@@ -147,7 +149,8 @@ test("M2: Ctrl+C durante o gh repo create (demorado) aborta e não chega no rest
   };
   await main(["setup", "--state-dir", a.estado, "--home", a.home], (l) => saidas.push(String(l)), io);
   const texto = saidas.join("\n");
-  assert.match(texto, /Interrompido \(Ctrl\+C\)\. Já feito: gravar a configuração\. NÃO executado: criar o repositório/);
+  assert.match(texto, /Interrompido \(Ctrl\+C\)\. Já feito: gravar a configuração\./);
+  assert.match(texto, /Interrompida durante: criar o repositório\. Ela pode ter sido parcialmente executada/);
   assert.equal(prompts.some((p) => /Enviar estes arquivos/.test(p)), false, "a publicação não começou");
   assert.deepEqual(chamadas.map((c) => c[0]), ["ghUsuario", "ghRepo", "ghCriarRepo"]);
 });
@@ -316,17 +319,6 @@ test("B5 + B6: a reconfirmação de SUBSTITUIR acontece SEM o lock e mostra a ta
   assert.equal(f.chamadas.some((c) => c[0] === "criarTarefa"), false);
 });
 
-test("B6: tarefaAtual lê o 'Tarefa a Executar' do schtasks (pt-BR/en) e sanitiza; sem a chave devolve null", async () => {
-  const mk = (saida) => externosPadrao({ plataforma: "win32", exec: (c, args, o, cb) => (queueMicrotask(() => cb(null, saida, "")), { stdin: { end() {} } }) });
-  assert.equal(await mk("Nome da Tarefa: x\r\nTarefa a Executar:       \"C:\\n.exe\" \"C:\\a.mjs\" run\u001b[31m\r\nOutra: 1\r\n").tarefaAtual("ai-usage-metrics"), '"C:\\n.exe" "C:\\a.mjs" run');
-  assert.equal(await mk("Task To Run:   cmd /c x\n").tarefaAtual("ai-usage-metrics"), "cmd /c x");
-  assert.equal(await mk("nada aqui\n").tarefaAtual("ai-usage-metrics"), null);
-  const chamadas = [];
-  const ext = externosPadrao({ plataforma: "win32", exec: (c, args, o, cb) => (chamadas.push([c, args]), queueMicrotask(() => cb(null, "", "")), { stdin: { end() {} } }) });
-  await ext.tarefaAtual("ai-usage-metrics");
-  assert.deepEqual(chamadas[0], ["schtasks", ["/Query", "/TN", "ai-usage-metrics", "/FO", "LIST", "/V"]]);
-});
-
 test("B7: o consentimento da API avisa que o GitHub vê o IP do usuário", async () => {
   const a = await amb();
   const r = await rodar({ a, ext: falsos({}).ext, ambiente: { plataforma: "linux" }, regras: [[/Seu usuário/, "usuario-teste"], [/Gravar a configuração/, "n"]] });
@@ -334,3 +326,179 @@ test("B7: o consentimento da API avisa que o GitHub vê o IP do usuário", async
 });
 
 void SetupCancelado;
+
+// ---------- 0.3.1 ----------
+
+const XML_PTBR = `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Actions Context="Author">
+    <Exec>
+      <Command>"C:\\Program Files\\nodejs\\node.exe"</Command>
+      <Arguments>"C:\\pacote\\bin\\a.mjs" "run" "--non-interactive" "--state-dir" "C:\\Dados &amp; Co\\e"</Arguments>
+    </Exec>
+  </Actions>
+</Task>`;
+const LISTA_PTBR = "Nome do host:                                           PC\r\nNome da tarefa:                                          \\ai-usage-metrics\r\nTarefa a ser executada:                                  \"C:\\Program Files\\nodejs\\node.exe\" \"C:\\pacote\\bin\\a.mjs\" \"run\"\r\nExecutar como Usuário:                                   x\r\n";
+const LISTA_EN = "HostName:                             PC\r\nTask To Run:                          \"C:\\node.exe\" \"C:\\a.mjs\" run\r\nRun As User:                          x\r\n";
+const execSaidas = (porArg) => (cmd, args, o, cb) => {
+  const r = porArg(args) ?? { erro: true };
+  queueMicrotask(() => (r.erro ? cb(Object.assign(new Error("x"), { code: 1 }), "", "") : cb(null, r.stdout, "")));
+  return { stdin: { end() {} } };
+};
+
+test("0.3.1 #1: tarefaAtual lê o XML (independe do idioma) e cai para as chaves em texto; saída hostil é sanitizada e limitada", async () => {
+  const chamadas = [];
+  const via = (mapa) => externosPadrao({ plataforma: "win32", exec: execSaidas((args) => (chamadas.push(args.slice(2).join(" ")), mapa(args))) });
+  // XML real (pt-BR e en têm o mesmo formato): Command + Arguments, entidades desescapadas
+  const xml = via((a) => (a.includes("/XML") ? { stdout: XML_PTBR } : null));
+  assert.equal(await xml.tarefaAtual("ai-usage-metrics"), '"C:\\Program Files\\nodejs\\node.exe" "C:\\pacote\\bin\\a.mjs" "run" "--non-interactive" "--state-dir" "C:\\Dados & Co\\e"');
+  assert.equal(chamadas[0], "ai-usage-metrics /XML", "o XML é a primeira tentativa");
+  // XML falhou: LIST /V com as chaves reais do Windows pt-BR ("Tarefa a ser executada") e en ("Task To Run")
+  assert.equal(await via((a) => (a.includes("LIST") ? { stdout: LISTA_PTBR } : null)).tarefaAtual("x"), '"C:\\Program Files\\nodejs\\node.exe" "C:\\pacote\\bin\\a.mjs" "run"');
+  assert.equal(await via((a) => (a.includes("LIST") ? { stdout: LISTA_EN } : null)).tarefaAtual("x"), '"C:\\node.exe" "C:\\a.mjs" run');
+  assert.equal(await via(() => null).tarefaAtual("x"), null);
+  // hostil: ESC/CSI, bidi, zero-width, entidade numérica de ESC, texto enorme
+  const hostil = `<Exec><Command>C:\\a.exe</Command><Arguments>\u001b[31mx\u202e\u200b&#27;[2J${"y".repeat(1000)}</Arguments></Exec>`;
+  const r = await via((a) => (a.includes("/XML") ? { stdout: hostil } : null)).tarefaAtual("x");
+  assert.ok(r.length <= 300);
+  assert.doesNotMatch(r, /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u200b-\u200f\u2066-\u2069\ufeff]/);
+  assert.match(r, /\\u\{202e\}/);
+  // XML sem <Exec>, enorme ou lixo: sem resultado (cai para a lista, que também não tem a chave)
+  assert.equal(await via((a) => (a.includes("/XML") ? { stdout: "<Task></Task>" } : { stdout: "nada" })).tarefaAtual("x"), null);
+});
+
+test("0.3.1 #2: bidi, zero-width e separadores são recusados em commitEmail/commitName/title/pasta; limparTexto os escapa", async () => {
+  const bidi = "x\u202emoc.buhtig.yreplon.sresu@evil";
+  assert.throws(() => normalizarConfig({ githubUser: "ab", commitEmail: bidi }), /commitEmail inválido/);
+  for (const e of ["a\u200bb@x.com", "a\ufeff@x.com", "a@x\u200d.com", "a\u2028b@x.com", "a\u2066b@x.com"]) assert.throws(() => normalizarConfig({ githubUser: "ab", commitEmail: e }), /commitEmail inválido/, JSON.stringify(e));
+  for (const n of ["Fulano\u202e", "Ful\u200bano", "Ful\u2028ano", "Ful\u2029ano", "Ful\u2069ano"]) assert.throws(() => normalizarConfig({ githubUser: "ab", commitName: n }), /commitName inválido/, JSON.stringify(n));
+  assert.ok(normalizarConfig({ githubUser: "ab", commitName: "José Çñ 日本", commitEmail: "1+ab@users.noreply.github.com" }));
+  for (const tt of ["Meu\u202e painel", "a\u200bb", "x\u2028y"]) assert.throws(() => normalizarConfig({ githubUser: "ab", title: tt }), /title/, JSON.stringify(tt));
+  assert.throws(() => normalizarConfig({ githubUser: "ab", publicProjects: { "pasta\u202e": "ok" } }), /controle/);
+  const l = limparTexto("a\u202eb\u200bc\ufeffd\u2066e");
+  assert.doesNotMatch(l, /[\u202a-\u202e\u200b-\u200f\u2066-\u2069\ufeff]/);
+  assert.equal(l, "a\\u{202e}b\\u{200b}c\\u{feff}d\\u{2066}e");
+  // o título hostil também é barrado antes de chegar ao SVG (comando render) e ao resumo do setup
+  const estado = await tmp();
+  await assert.rejects(main(["render", "--title", "x\u202eevil", "--state-dir", estado], () => {}, { isTTY: false, ask: async () => "" }), /title/);
+  const a = await amb();
+  await writeFile(a.config, JSON.stringify({ githubUser: "usuario-teste", title: "Painel" }));
+  const r = await rodar({ a, ext: falsos({}).ext, ambiente: { plataforma: "linux" }, regras: [[/Seu usuário/, ""], [/Gravar a configuração/, "n"]] });
+  assert.match(r.texto, /título "Painel"/);
+  assert.doesNotMatch(r.texto, /[\u202a-\u202e\u200b-\u200f]/);
+});
+
+test("0.3.1 #3: o signal chega a ghUsuario/ghRepo/apiUsuario/apiRepo; signal já abortado nem abre a conexão", async () => {
+  const sinais = [];
+  const exec = (cmd, args, opts, cb) => (sinais.push(opts.signal), queueMicrotask(() => cb(null, "{}", "")), { stdin: { end() {} } });
+  const ctl = new AbortController();
+  const ext = externosPadrao({ exec });
+  await ext.ghUsuario({ signal: ctl.signal });
+  await ext.ghRepo("usuario-teste", "ai-metrics", { signal: ctl.signal });
+  assert.deepEqual(sinais, [ctl.signal, ctl.signal]);
+  // abortado na entrada: nenhuma conexão é aberta
+  ctl.abort();
+  const pedidos = [];
+  const request = () => (pedidos.push(1), assert.fail("não deve abrir conexão"));
+  assert.deepEqual(await apiGet("/users/usuario-teste", { request, signal: ctl.signal }), { erro: "cancelado" });
+  const api = externosPadrao({ request });
+  assert.deepEqual(await api.apiUsuario("usuario-teste", { signal: ctl.signal }), { estado: "erro", motivo: "cancelado" });
+  assert.deepEqual(await api.apiRepo("usuario-teste", "ai-metrics", { signal: ctl.signal }), { estado: "erro", motivo: "cancelado" });
+  assert.equal(pedidos.length, 0);
+  // gh abortado devolve "cancelado" (o assistente encerra), não "sem login"
+  const abortado = externosPadrao({ exec: (c, a, o, cb) => (queueMicrotask(() => cb(Object.assign(new Error("a"), { name: "AbortError", code: "ABORT_ERR" }), "", "")), { stdin: { end() {} } }) });
+  assert.deepEqual(await abortado.ghUsuario(), { estado: "cancelado" });
+});
+
+test("0.3.1 #3: Ctrl+C numa consulta inicial (gh api user) encerra o assistente sem gravar nada", async () => {
+  const a = await amb();
+  const h = {};
+  const { ext, chamadas } = falsos({
+    ghUsuario: ({ signal }) => new Promise((res) => {
+      signal.addEventListener("abort", () => res({ estado: "cancelado" }), { once: true });
+      setTimeout(() => h.io.cancelar(), 20);
+    }),
+  });
+  const r = await rodar({ a, ext, regras: [[/gh api user/, "s"]], ambiente: { plataforma: "linux" }, holder: h });
+  assert.match(r.texto, /Assistente encerrado \(cancelado durante uma consulta externa\)/);
+  assert.match(r.texto, /Nada foi gravado/);
+  assert.deepEqual(chamadas.map((c) => c[0]), ["ghUsuario"]);
+  assert.equal(existsSync(a.config), false);
+});
+
+test("0.3.1 #4: a ação em curso é dita 'interrompida; pode ter sido parcialmente executada', e só as não iniciadas são 'NÃO executado'", async () => {
+  const a = await amb();
+  const h = {};
+  const { ext } = falsos({
+    tarefaExiste: false,
+    npmInstalar: ({ signal }) => new Promise((res) => {
+      signal.addEventListener("abort", () => res({ ok: false, cancelado: true, motivo: "cancelado" }), { once: true });
+      setTimeout(() => h.io.cancelar(), 20);
+    }),
+  });
+  const r = await rodar({ a, ext, regras: REGRAS_NPX, ambiente: { bin: NPX }, holder: h });
+  assert.match(r.texto, /Já feito: gravar a configuração\./);
+  assert.match(r.texto, /Interrompida durante: npm install da cópia fixa\. Ela pode ter sido parcialmente executada: confira o GitHub, o Agendador de Tarefas/);
+  assert.match(r.texto, /NÃO executado: criar a tarefa agendada\./);
+  assert.doesNotMatch(r.texto, /NÃO executado:[^\n]*npm install/, "a ação em curso não é chamada de 'não executada'");
+});
+
+test("0.3.1 #5: Ctrl+C no prompt do publish encerra o assistente, não grava aprovação, não envia e não mostra 'Pronto'", async () => {
+  const a = await amb();
+  const { ext } = falsos({});
+  const r = await rodar({
+    a,
+    ext,
+    ambiente: { plataforma: "linux" },
+    regras: [[/Seu usuário/, "usuario-teste"], [/Gravar a configuração/, "s"]],
+    durante: (p) => {
+      if (/Enviar estes arquivos/.test(p)) throw new SetupCancelado("entrada encerrada");
+    },
+  });
+  assert.match(r.texto, /Assistente encerrado \(entrada encerrada\)/);
+  assert.match(r.texto, /JÁ tinha sido gravada/);
+  assert.doesNotMatch(r.texto, /Pronto|raw\.githubusercontent\.com/);
+  assert.equal(existsSync(a.paths.estado), false, "nenhuma aprovação (state.json) foi gravada");
+  assert.equal(existsSync(join(a.estado, ".lock")), false);
+});
+
+test("0.3.1 #6: npmInstalar confere nome e versão instalados (package.json); outro pacote ou versão é falha", async () => {
+  const prefixo = await tmp();
+  const raiz = join(prefixo, "node_modules", "ai-usage-metrics");
+  const { mkdir } = await import("node:fs/promises");
+  await mkdir(join(raiz, "bin"), { recursive: true });
+  await writeFile(join(raiz, "bin", "ai-usage-metrics.mjs"), "// x\n");
+  const exec = (cmd, args, opts, cb) => (queueMicrotask(() => cb(null, "", "")), { stdin: { end() {} } });
+  const ext = externosPadrao({ exec, npmCli: "C:\\npm-falso\\npm-cli.js" });
+  const grava = (o) => writeFile(join(raiz, "package.json"), JSON.stringify(o));
+  await grava({ name: "outro-pacote", version: "0.2.0" });
+  const a = await ext.npmInstalar({ prefixo, versao: "0.2.0" });
+  assert.equal(a.ok, false);
+  assert.match(a.motivo, /instalou outra coisa \(outro-pacote@0\.2\.0\) em vez de ai-usage-metrics@0\.2\.0/);
+  await grava({ name: "ai-usage-metrics", version: "9.9.9" });
+  assert.equal((await ext.npmInstalar({ prefixo, versao: "0.2.0" })).ok, false);
+  await writeFile(join(raiz, "package.json"), "não é json");
+  assert.equal((await ext.npmInstalar({ prefixo, versao: "0.2.0" })).ok, false);
+  await grava({ name: "ai-usage-metrics", version: "0.2.0" });
+  assert.deepEqual(await ext.npmInstalar({ prefixo, versao: "0.2.0" }), { ok: true, bin: join(raiz, "bin", "ai-usage-metrics.mjs") });
+  // no assistente: instalação trocada => a tarefa NÃO é criada
+  const w = await amb();
+  const { ext: falso, chamadas } = falsos({ tarefaExiste: false, npmInstalar: { ok: false, motivo: "o npm instalou outra coisa (x@1.0.0) em vez de ai-usage-metrics@0.2.0; a tarefa não será criada" } });
+  const r = await rodar({ a: w, ext: falso, regras: REGRAS_NPX, ambiente: { bin: NPX } });
+  assert.equal(chamadas.some((c) => c[0] === "criarTarefa"), false);
+  assert.match(r.texto, /instalou outra coisa/);
+});
+
+test("0.3.1 #9: a poda das cópias .bak é numérica (.bak.2 < .bak.10), não depende do mtime, e mantém as 5 mais novas", async () => {
+  const dir = await tmp();
+  const cfg = join(dir, "config.json");
+  const quando = new Date("2030-01-01T00:00:00Z");
+  for (let i = 0; i < 13; i++) {
+    await writeFile(cfg, JSON.stringify({ n: i }));
+    const dest = await copiaDeSeguranca(cfg);
+    utimesSync(dest, quando, quando); // todas com o MESMO mtime: só o número decide
+  }
+  const nomes = (await readdir(dir)).filter((n) => n.startsWith("config.json.bak")).sort((x, y) => x.length - y.length || (x < y ? -1 : 1));
+  assert.deepEqual(nomes, ["config.json.bak.8", "config.json.bak.9", "config.json.bak.10", "config.json.bak.11", "config.json.bak.12"].sort((x, y) => x.length - y.length || (x < y ? -1 : 1)));
+  assert.equal(JSON.parse(await readFile(join(dir, "config.json.bak.12"), "utf8")).n, 12);
+});

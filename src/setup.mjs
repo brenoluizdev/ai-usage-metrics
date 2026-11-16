@@ -159,8 +159,10 @@ export async function copiaDeSeguranca(arquivo) {
     const st = await lstat(p).catch(() => null);
     if (st?.isFile() && !st.isSymbolicLink()) todas.push([p, st.mtimeMs]);
   }
-  // A cópia recém-criada sempre fica; das outras, as (MAX_COPIAS - 1) mais recentes por data.
-  const outras = todas.filter(([p]) => p !== destino).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? 1 : -1));
+  // A cópia recém-criada sempre fica; das outras, as (MAX_COPIAS - 1) de MAIOR número (.bak = 0; .bak.2 < .bak.10): o número só cresce, então
+  // é a ordem de criação, sem depender do relógio/mtime.
+  const numero = ([p]) => (/\.bak\.(\d+)$/.exec(p)?.[1] ? Number(/\.bak\.(\d+)$/.exec(p)[1]) : 0);
+  const outras = todas.filter(([p]) => p !== destino).sort((a, b) => numero(b) - numero(a));
   for (const [p] of outras.slice(MAX_COPIAS - 1)) await rm(p, { force: true });
   return destino;
 }
@@ -407,7 +409,8 @@ class Assistente {
     let login = null;
     let id = null;
     if (await this.sim("Consultar o gh instalado, executando `gh api user` (usa o login do próprio gh; esta ferramenta não lê token)?")) {
-      const r = await ext.ghUsuario();
+      const r = await ext.ghUsuario({ signal: this.sinal });
+      this.cancelou();
       if (r.estado === "ok" && usuarioValido(r.login) && idValido(r.id)) {
         out(`  O gh está autenticado como ${r.login} (id ${r.id}).`);
         if (await this.sim("Usar esta conta?", true)) {
@@ -426,7 +429,8 @@ class Assistente {
       });
       id = d.commitEmail && login.toLowerCase() === String(d.githubUser).toLowerCase() ? idDoNoreply(d.commitEmail, login) : null;
       if (!id && (await this.sim(`Consultar a API pública do GitHub (um GET em https://api.github.com/users/${login}, sem credenciais; o GitHub verá o seu IP; proxy só com NODE_USE_ENV_PROXY=1) para descobrir o seu ID numérico?`))) {
-        const r = await ext.apiUsuario(login);
+        const r = await ext.apiUsuario(login, { signal: this.sinal });
+        this.cancelou();
         if (r.estado === "ok" && usuarioValido(r.login) && idValido(r.id)) {
           login = r.login;
           id = r.id;
@@ -479,10 +483,11 @@ class Assistente {
     d.repoEstado = "desconhecido";
     let r = null;
     if (this.gh) {
-      if (await this.sim(`Consultar o repositório com \`gh repo view ${alvo}\` (rede, via gh)?`)) r = await ext.ghRepo(d.githubUser, d.dataRepo);
+      if (await this.sim(`Consultar o repositório com \`gh repo view ${alvo}\` (rede, via gh)?`)) r = await ext.ghRepo(d.githubUser, d.dataRepo, { signal: this.sinal });
     } else if (await this.sim(`Consultar a API pública do GitHub (GET https://api.github.com/repos/${alvo}, sem credenciais; o GitHub verá o seu IP; um repositório privado aparece como inexistente)?`)) {
-      r = await ext.apiRepo(d.githubUser, d.dataRepo);
+      r = await ext.apiRepo(d.githubUser, d.dataRepo, { signal: this.sinal });
     }
+    this.cancelou();
     if (r?.estado === "existe" && r.privado === false) {
       d.repoEstado = "publico";
       out("  O repositório existe e é público: ok.");
@@ -753,7 +758,7 @@ class Assistente {
     out(`  Usuário/repositório: ${config.githubUser}/${config.dataRepo} (${d.repoEstado ?? "mantido"})`);
     out(`  Autor do commit: ${limparTexto(config.commitName ?? config.githubUser, 100)} <${limparTexto(config.commitEmail ?? emailNoreply(config.githubUser, null), 100)}>`);
     out(`  Projetos com nome público: ${nomes.length ? nomes.join(", ") : "nenhum (todos anonimizados)"}`);
-    out(`  Modelo ${config.model}, idioma ${config.lang}, tema ${config.theme}, título ${config.title ? `"${config.title}"` : "padrão"}`);
+    out(`  Modelo ${config.model}, idioma ${config.lang}, tema ${config.theme}, título ${config.title ? `"${limparTexto(config.title, 80)}"` : "padrão"}`);
     out(`  Cores: ${config.colors || config.colorsDark ? "personalizadas" : "padrão"}; autoPublish: ${config.autoPublish ? "ligado" : "desligado"}`);
     const acoes = [];
     if (d.criarRepo) acoes.push(`criar o repositório PÚBLICO ${config.githubUser}/${config.dataRepo} com o gh`);
@@ -781,11 +786,19 @@ class Assistente {
   }
 
   /** Ctrl+C: diz o que já foi feito e o que NÃO foi, e interrompe (as ações seguintes não executam). */
-  checar(feito, pendentes) {
+  checar(feito, atual = null) {
     if (!this.sinal?.aborted) return;
+    const pendentes = (this.todasAcoes ?? []).filter((x) => !feito.includes(x) && x !== atual);
     this.out("");
-    this.out(this.aviso(`Interrompido (Ctrl+C). Já feito: ${feito.length ? feito.join("; ") : "nada"}. NÃO executado: ${pendentes.length ? pendentes.join("; ") : "nada pendente"}.`));
+    this.out(this.aviso(`Interrompido (Ctrl+C). Já feito: ${feito.length ? feito.join("; ") : "nada"}.`));
+    if (atual) this.out(this.aviso(`  Interrompida durante: ${atual}. Ela pode ter sido parcialmente executada: confira o GitHub, o Agendador de Tarefas e a pasta da cópia fixa antes de repetir.`));
+    this.out(this.aviso(`  NÃO executado: ${pendentes.length ? pendentes.join("; ") : "nada pendente"}.`));
     throw new SetupCancelado("cancelado durante uma ação externa");
+  }
+
+  /** Ctrl+C durante uma consulta externa (gh/API): encerra o assistente (nada foi gravado ainda). */
+  cancelou() {
+    if (this.sinal?.aborted) throw new SetupCancelado("cancelado durante uma consulta externa");
   }
 
   async executarAcoes(config) {
@@ -797,7 +810,7 @@ class Assistente {
     if (d.restore) todas.push("restore do histórico");
     if (d.instalarRuntime) todas.push("npm install da cópia fixa");
     if (d.criarTarefa) todas.push("criar a tarefa agendada");
-    const pend = () => todas.filter((t) => !feito.includes(t)); // o que falhou ou foi cancelado conta como NÃO executado
+    this.todasAcoes = todas; // o que falhou ou foi cancelado conta como NÃO executado
     await this.comLock(async () => {
       if (await existe(this.configPath)) {
         const bak = await copiaDeSeguranca(this.configPath);
@@ -807,7 +820,7 @@ class Assistente {
       this.gravou = true;
       feito.push("gravar a configuração");
       out(`Configuração gravada em ${this.configPath}`);
-      this.checar(feito, pend());
+      this.checar(feito);
       if (d.criarRepo) {
         const r = await ext.ghCriarRepo(config.githubUser, config.dataRepo, { signal: sinal });
         if (r.ok) {
@@ -817,7 +830,7 @@ class Assistente {
           this.pronto = false;
           out(this.aviso(`Não consegui criar o repositório (${limparTexto(r.motivo ?? "erro", 160)}). Crie-o à mão em https://github.com/new (público, vazio) antes de publicar.`));
         }
-        this.checar(feito, pend());
+        this.checar(feito, r.ok ? null : "criar o repositório");
       }
       if (d.restore) {
         try {
@@ -826,7 +839,7 @@ class Assistente {
         } catch (e) {
           out(this.aviso(`restore não concluído: ${limparTexto(e.message, 200)}`));
         }
-        this.checar(feito, pend()); // o git do restore não é abortável no meio: o Ctrl+C vale ao terminar
+        this.checar(feito); // o git do restore não é abortável no meio: o Ctrl+C vale ao terminar
       }
       let bin = d.binAgenda;
       if (d.instalarRuntime) {
@@ -839,7 +852,7 @@ class Assistente {
           d.criarTarefa = false;
           out(this.aviso(`Não consegui instalar a cópia fixa (${limparTexto(r.motivo ?? "erro", 160)}); a tarefa NÃO foi criada.`));
         }
-        this.checar(feito, pend());
+        this.checar(feito, r.ok ? null : "npm install da cópia fixa");
       }
       if (d.criarTarefa) {
         // Só confere de novo (sem perguntar): se apareceu uma tarefa depois da confirmação e o usuário não aceitou substituir, mantém a existente.
@@ -852,7 +865,7 @@ class Assistente {
         if (r.ok) feito.push("criar a tarefa agendada");
         out(r.ok ? `Tarefa "${NOME_TAREFA}" criada: diária às ${d.horario}.` : this.aviso(`Não consegui criar a tarefa (${limparTexto(r.motivo ?? "erro", 200)}). Use as instruções impressas ao final.`));
         if (!r.ok) d.tarefaFalhou = true;
-        this.checar(feito, pend());
+        this.checar(feito, r.ok ? null : "criar a tarefa agendada");
       }
     });
   }
@@ -875,6 +888,7 @@ class Assistente {
         this.publicou = Boolean(r?.enviado || r?.jaPublicado);
       });
     } catch (e) {
+      if (e instanceof SetupCancelado) throw e; // Ctrl+C/fim da entrada no meio da publicação: encerra o assistente (sem mostrar "Pronto")
       out(this.aviso(`A publicação não foi concluída: ${limparTexto(e.message, 240)}`));
     }
     if (!this.publicou) {
