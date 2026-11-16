@@ -15,6 +15,7 @@ import { AVISO_SEM_REFERENCIA, baixarMetricasPublicadas, descreverPlano, enviar,
 import { toPublic } from "./public.mjs";
 import { renderTerminal } from "./report.mjs";
 import { exigirMetricasValidas } from "./schema.mjs";
+import { limparTexto } from "./texto.mjs";
 import { IDIOMAS, MODELOS, MODELO_PADRAO, TEMAS, gerarSvg } from "./svg.mjs";
 
 const COMANDOS = ["sources", "report", "export", "render", "publish", "init", "run", "restore", "history", "setup"];
@@ -299,7 +300,7 @@ async function etapaPublish({ config, paths, jsonPath, home, yes, dryRun, aceita
       return { enviado: false };
     }
     if (!plano.autor.noreply) {
-      out(`Envio automático BLOQUEADO: o e-mail do commit (${plano.autor.email}) não é um noreply do GitHub; só um publish manual pode publicá-lo (veja SECURITY.md).`);
+      out(`Envio automático BLOQUEADO: o e-mail do commit (${limparTexto(plano.autor.email, 100)}) não é um noreply do GitHub; só um publish manual pode publicá-lo (veja SECURITY.md).`);
       return { enviado: false };
     }
     if (perda) {
@@ -320,13 +321,13 @@ async function etapaPublish({ config, paths, jsonPath, home, yes, dryRun, aceita
     }
     if (!plano.autor.noreply) {
       if (io.isTTY) {
-        const r = await io.ask(`O e-mail ${plano.autor.email} ficará PÚBLICO e permanente no histórico. Para continuar digite exatamente: publicar meu e-mail\n> `);
+        const r = await io.ask(`O e-mail ${limparTexto(plano.autor.email, 100)} ficará PÚBLICO e permanente no histórico. Para continuar digite exatamente: publicar meu e-mail\n> `);
         if (r.trim() !== "publicar meu e-mail") {
           out("Cancelado: e-mail do commit não confirmado; nada foi enviado.");
           return { enviado: false };
         }
       } else if (!aceitaEmail) {
-        out(`Bloqueado: o e-mail do commit (${plano.autor.email}) não é um noreply do GitHub. Defina "commitEmail" com o noreply na configuração, ou rode com --accept-public-email se aceita publicá-lo.`);
+        out(`Bloqueado: o e-mail do commit (${limparTexto(plano.autor.email, 100)}) não é um noreply do GitHub. Defina "commitEmail" com o noreply na configuração, ou rode com --accept-public-email se aceita publicá-lo.`);
         return { enviado: false };
       }
     }

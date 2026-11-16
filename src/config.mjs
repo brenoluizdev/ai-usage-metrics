@@ -218,9 +218,9 @@ export function normalizarRemoto(url) {
 }
 
 const SUFIXO_NOREPLY = "@users.noreply.github.com";
-const EMAIL_COMMIT = /^[^\s@<>,;:"'\\]{1,64}@[A-Za-z0-9.-]{1,190}$/;
-// eslint-disable-next-line no-control-regex
-const NOME_COMMIT = /^[^\u0000-\u001F\u007F<>\\]{1,100}$/;
+// Sem \p{Cc} (C0, DEL e C1: inclui ESC e U+009B) em nenhum dos dois: o valor vai para a tela e para o histórico público.
+const EMAIL_COMMIT = /^(?!.*\p{Cc})[^\s@<>,;:"'\\]{1,64}@[A-Za-z0-9.-]{1,190}$/u;
+const NOME_COMMIT = /^(?!.*\p{Cc})[^<>\\]{1,100}$/u;
 
 /** Autor/committer que irá para o histórico público. Padrão: <githubUser>@users.noreply.github.com. */
 export function autorDoCommit(c) {

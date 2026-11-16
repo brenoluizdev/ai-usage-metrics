@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { ADAPTERS } from "./adapters/index.mjs";
 import { aposentarClone, cloneEhNosso, gravarMarcadores } from "./clone-owner.mjs";
 import { autorDoCommit, hostDoRemoto, modoTesteRemotoLocal, normalizarRemoto, urlDoRemoto, validarRemoto } from "./config.mjs";
+import { limparTexto } from "./texto.mjs";
 import { garantirSemVazamento, garantirSvgSemVazamento, lerAllowlist, validarTitulo } from "./privacy.mjs";
 import { lerArquivoLimitado } from "./limitado.mjs";
 import { avaliarRegressao, linhasDeRegressao } from "./regressao.mjs";
@@ -235,7 +236,7 @@ export function descreverPlano(plano) {
   if (!plano.cloneExiste) L.push("  clone local de dados: ainda não existe (será criado na confirmação); diferenças abaixo são contra um repositório vazio.");
   for (const a of plano.arquivos) L.push(`  - ${a.nome}  ${a.bytes} bytes  [${a.status}${a.status === "sem mudança" ? "" : `: +${a.add} -${a.rem} linhas`}]`);
   L.push(`  commit: "${MENSAGEM_DE_COMMIT}" (somente esses ${ARQUIVOS.length} arquivos)`);
-  L.push(`  autor do commit (vai para o histórico público): ${plano.autor.name} <${plano.autor.email}>`);
+  L.push(`  autor do commit (vai para o histórico público): ${limparTexto(plano.autor.name, 100)} <${limparTexto(plano.autor.email, 100)}>`);
   if (!plano.autor.noreply) {
     L.push("  ATENÇÃO: este e-mail NÃO é um endereço noreply do GitHub (…@users.noreply.github.com); ele ficará PÚBLICO e permanente no histórico.");
     L.push('  Para usar o noreply, ajuste "commitEmail" na configuração (veja SECURITY.md). O envio exige confirmação extra.');
