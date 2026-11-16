@@ -11,11 +11,12 @@ import { aposentarClone, cloneEhNosso, gravarMarcadores } from "./clone-owner.mj
 import { autorDoCommit, hostDoRemoto, modoTesteRemotoLocal, normalizarRemoto, urlDoRemoto, validarRemoto } from "./config.mjs";
 import { garantirSemVazamento, garantirSvgSemVazamento, lerAllowlist, validarTitulo } from "./privacy.mjs";
 import { exigirMetricasValidas } from "./schema.mjs";
-import { gerarSvg } from "./svg.mjs";
+import { MODELOS, MODELO_PADRAO, gerarSvg } from "./svg.mjs";
 
 const execFileP = promisify(execFile);
 
-export const ARQUIVOS = Object.freeze(["metrics.json", "metrics.svg"]);
+// Lista FIXA (allowlist) do que o publish escreve, adiciona ao git e envia: arquivos planos na raiz do repositório de dados.
+export const ARQUIVOS = Object.freeze(["metrics.json", "metrics.svg", ...MODELOS.map((m) => `metrics.${m}.svg`)]);
 export const MENSAGEM_DE_COMMIT = "chore(metrics): update AI usage metrics";
 
 /** Remove credenciais de qualquer texto que vá para mensagem de erro ou log (user:senha@host). */
@@ -173,11 +174,16 @@ export async function planejar({ config, caminhos, jsonPath, home }) {
 
   const jsonFinal = JSON.stringify(json, null, 2) + "\n";
   if (config.title !== undefined) validarTitulo(config.title, home);
-  const svg = gerarSvg(json, { tema: config.theme, titulo: config.title, idioma: config.lang });
-  garantirSvgSemVazamento(svg, home); // o SVG que será enviado também passa pela barreira de privacidade
+  // Todos os SVGs são regerados aqui a partir do JSON validado (nunca se envia um SVG pronto do disco), com as mesmas cores,
+  // e cada um passa pela barreira de privacidade antes de ser enviado. metrics.svg = o modelo escolhido em `model`.
+  const opcoesSvg = { tema: config.theme, titulo: config.title, idioma: config.lang, cores: config.colors, coresEscuro: config.colorsDark };
+  const svgs = Object.fromEntries(MODELOS.map((m) => [m, gerarSvg(json, { ...opcoesSvg, modelo: m })]));
+  for (const svg of Object.values(svgs)) garantirSvgSemVazamento(svg, home);
 
-  const antigos = { "metrics.json": await lerSeExiste(join(caminhos.clone, "metrics.json")), "metrics.svg": await lerSeExiste(join(caminhos.clone, "metrics.svg")) };
-  const novos = { "metrics.json": jsonFinal, "metrics.svg": svg };
+  const novos = { "metrics.json": jsonFinal, "metrics.svg": svgs[config.model ?? MODELO_PADRAO] };
+  for (const m of MODELOS) novos[`metrics.${m}.svg`] = svgs[m];
+  const antigos = {};
+  for (const nome of ARQUIVOS) antigos[nome] = await lerSeExiste(join(caminhos.clone, nome));
   const arquivos = ARQUIVOS.map((nome) => {
     const velho = antigos[nome];
     const status = velho === null ? "novo" : velho === novos[nome] ? "sem mudança" : "alterado";
@@ -225,7 +231,7 @@ export function descreverPlano(plano) {
   const t = plano.json.totals;
   L.push(`Resumo dos números: ${t.sessions} sessões, ${t.userMessages} mensagens, ${t.activeDays} dias ativos, ${t.projects} projetos.`);
   if (plano.anterior) L.push(`  antes: ${plano.anterior.sessions} sessões, ${plano.anterior.userMessages} mensagens.`);
-  L.push("Validação: esquema v1 estrito OK; barreira de privacidade OK; SVG gerado só a partir do JSON validado.");
+  L.push("Validação: esquema v1 estrito OK; barreira de privacidade OK; SVGs gerados só a partir do JSON validado.");
   L.push(`Privacidade: ${plano.anonimizados} projeto(s) anonimizado(s) (projeto-privado-N).`);
   L.push(plano.publicos.length ? `  Nomes que ficariam PÚBLICOS: ${plano.publicos.join(", ")}.` : "  Nenhum nome de projeto ficaria público.");
   L.push("  Datas, quantidades e a ordem do ranking também ficam públicas. O histórico de um repositório público é permanente.");
@@ -310,7 +316,7 @@ async function exigirPastaRepoSegura(caminhos) {
 }
 
 /**
- * Sincroniza o clone local, escreve os 2 arquivos, faz commit e push (sem force).
+ * Sincroniza o clone local, escreve os arquivos de ARQUIVOS, faz commit e push (sem force).
  * O clone em cache é só nosso: antes de escrever ele é alinhado ao remoto (checkout -B local, nunca force no remoto).
  * Proteções: remoto validado (https/ssh), ambiente do git por allowlist, hooks do usuário desligados, symlinks recusados,
  * escrita atômica, autor do commit explícito (padrão: noreply do GitHub).
@@ -360,7 +366,7 @@ export async function enviar(plano, { config, caminhos, interativo, avisar = () 
 
   // Se o remoto traz metrics.* como link simbólico (modo 120000) ou outra coisa que não arquivo comum, recuso.
   const modos = async () => (await g(["ls-files", "-s", "--", ...ARQUIVOS])).split("\n").filter(Boolean).map((l) => l.split(/\s+/)[0]);
-  if ((await modos()).some((m) => m !== "100644" && m !== "100755")) throw new Error("O repositório de dados tem metrics.json/metrics.svg que não são arquivos comuns (link simbólico?). Recuso; corrija o repositório.");
+  if ((await modos()).some((m) => m !== "100644" && m !== "100755")) throw new Error("O repositório de dados tem metrics.json/metrics*.svg que não são arquivos comuns (link simbólico?). Recuso; corrija o repositório.");
 
   for (const a of plano.arquivos) await escreverAtomico(caminhos.clone, a.nome, a.conteudo);
   await g(["add", "--", ...ARQUIVOS]);

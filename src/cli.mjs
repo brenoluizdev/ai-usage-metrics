@@ -13,7 +13,7 @@ import { descreverPlano, enviar, planejar } from "./publish.mjs";
 import { toPublic } from "./public.mjs";
 import { renderTerminal } from "./report.mjs";
 import { exigirMetricasValidas } from "./schema.mjs";
-import { IDIOMAS, TEMAS, gerarSvg } from "./svg.mjs";
+import { IDIOMAS, MODELOS, MODELO_PADRAO, TEMAS, gerarSvg } from "./svg.mjs";
 
 const COMANDOS = ["sources", "report", "export", "render", "publish", "init", "run"];
 const BOOLEANAS = ["help", "yes", "dry-run", "overwrite", "accept-public-email", "non-interactive"];
@@ -27,8 +27,9 @@ Comandos
   sources   lista as fontes e se existem neste computador
   report    resumo no terminal (mostra nomes reais de projetos: não publique)
   export    gera o JSON agregado e anonimizado (esquema v1)
-  render    gera o SVG a partir do JSON
-  publish   DRY-RUN por padrão: mostra o que seria enviado ao seu repositório de dados;
+  render    gera os SVGs (3 modelos) a partir do JSON
+  publish   DRY-RUN por padrão: mostra o que seria enviado ao seu repositório de dados
+            (metrics.json, metrics.svg e metrics.model-1/2/3.svg);
             só envia com confirmação (--yes ou pergunta interativa)
   init      cria a configuração local e imprime o trecho de README e o agendamento
   run       export -> render -> publish numa etapa (para o agendador)
@@ -42,10 +43,16 @@ Opções gerais
   --top <n>                 tamanho do ranking no report (padrão 10)
 
 export:   --out <arquivo>   (padrão <state-dir>/out/metrics.json)
-render:   --input <json> --out <svg> --theme auto|light|dark --title <texto> --lang en|pt-BR
+render:   --input <json> --theme auto|light|dark --title <texto> --lang en|pt-BR --model model-1|model-2|model-3
+          sem --out: grava metrics.svg (o modelo escolhido; padrão: "model" da configuração ou model-1) e também
+          metrics.model-1.svg, metrics.model-2.svg e metrics.model-3.svg em <state-dir>/out
+          --out <arquivo.svg>   grava SÓ esse arquivo (um único modelo)
+          --out-dir <pasta>     grava o conjunto completo (os 4 SVGs) nessa pasta
+          As cores vêm da configuração ("colors" e "colorsDark", só hexadecimal #rgb ou #rrggbb).
 publish:  --input <json> --yes (envia sem perguntar) --dry-run (nunca envia nem pergunta)
           --accept-public-email (sem terminal: aceita publicar um e-mail que não é noreply do GitHub)
 init:     --user <usuário GitHub> --repo <nome> --branch <nome> --public a,b --theme --lang --title --remote <url> --overwrite
+          --model model-1|model-2|model-3  --colors '{"accent":"#22c55e"}'  --colors-dark '{"background":"#1a1033"}'
 run:      em modo não interativo só envia se autoPublish for true e houver um publish manual confirmado
           --non-interactive (nunca pergunta nada, mesmo que haja um console: use no agendador; o Agendador do Windows
           dá um console ao processo, e sem esta opção o "run" esperaria a resposta de [s/N] para sempre)
@@ -160,12 +167,23 @@ async function etapaExport({ adapters, ctx, home, config, destino, paths, out })
   return json;
 }
 
-async function etapaRender({ jsonPath, svgPath, opcoes, home, out }) {
+/**
+ * Gera os SVGs a partir do JSON validado. `svgPath`: o arquivo do modelo escolhido (metrics.svg). `dirModelos`: se informado,
+ * também grava metrics.model-N.svg dos 3 modelos nessa pasta (mesmas cores). Tudo é gerado e verificado ANTES de gravar qualquer arquivo.
+ */
+async function etapaRender({ jsonPath, svgPath, dirModelos, opcoes, home, out }) {
   const json = exigirMetricasValidas(await lerJsonDoDisco(jsonPath));
-  const svg = gerarSvg(json, opcoes);
-  garantirSvgSemVazamento(svg, home); // o SVG final também passa pela barreira de privacidade
-  await gravar(svgPath, svg);
-  out(`SVG gravado em ${svgPath}`);
+  const gerar = (modelo) => {
+    const svg = gerarSvg(json, { ...opcoes, modelo });
+    garantirSvgSemVazamento(svg, home); // cada SVG final também passa pela barreira de privacidade
+    return svg;
+  };
+  const arquivos = [[svgPath, gerar(opcoes.modelo)]];
+  if (dirModelos) for (const m of MODELOS) arquivos.push([join(dirModelos, `metrics.${m}.svg`), gerar(m)]);
+  for (const [arquivo, svg] of arquivos) {
+    await gravar(arquivo, svg);
+    out(`SVG gravado em ${arquivo}`);
+  }
 }
 
 /** Destino e pastas públicas que o dono aprovou num publish manual: o envio automático só vale para exatamente isto. */
@@ -376,11 +394,22 @@ async function cmdInit({ args, paths, io, out }) {
   };
   if (args.title) bruto.title = args.title;
   if (args.remote) bruto.remoteUrl = args.remote;
+  if (args.model) bruto.model = args.model;
+  // Cores só entram na configuração se o usuário as passar (JSON); a validação estrita é a de normalizarConfig.
+  for (const [opcao, chave] of [["colors", "colors"], ["colors-dark", "colorsDark"]]) {
+    if (args[opcao] === undefined) continue;
+    try {
+      bruto[chave] = JSON.parse(args[opcao]);
+    } catch {
+      throw new Error(`--${opcao} deve ser um JSON, por exemplo '{"accent":"#22c55e"}'.`);
+    }
+  }
   const config = normalizarConfig(bruto);
 
   await gravarConfig(arquivo, config);
   out(`Configuração gravada em ${arquivo}`);
   out(`  repositório de dados: ${urlDoRemoto(config)} (branch ${config.branch})`);
+  out(`  modelo do metrics.svg: ${config.model ?? MODELO_PADRAO}`);
   out(`  projetos públicos: ${config.publicProjects.length ? JSON.stringify(config.publicProjects) : "nenhum (todos anonimizados)"}`);
   out("");
   out(`1) Crie o repositório PÚBLICO vazio ${config.githubUser}/${config.dataRepo} no GitHub (este comando não cria nada).`);
@@ -388,7 +417,16 @@ async function cmdInit({ args, paths, io, out }) {
   out("3) Envie a primeira vez, conferindo o que aparece:   ai-usage-metrics publish --yes");
   out("4) Cole no README do seu perfil (repositório <usuário>/<usuário>):");
   out("");
-  out(`   ![AI usage](https://raw.githubusercontent.com/${config.githubUser}/${config.dataRepo}/${config.branch}/metrics.svg)`);
+  const base = `https://raw.githubusercontent.com/${config.githubUser}/${config.dataRepo}/${config.branch}`;
+  out(`   ![AI usage](${base}/metrics.svg)`);
+  out("");
+  out("   O publish envia 4 SVGs; troque a URL para escolher o modelo (metrics.svg = o modelo da configuração):");
+  for (const arq of ["metrics.svg", ...MODELOS.map((m) => `metrics.${m}.svg`)]) out(`     ${base}/${arq}`);
+  out("");
+  out('5) Cores (opcional): edite o config.json e acrescente, por exemplo (só hexadecimal #rgb ou #rrggbb; legibilidade é por sua conta):');
+  out('   "colors": { "accent": "#22c55e", "tools": { "claude-code": "#16a34a" } },');
+  out('   "colorsDark": { "background": "#1a1033", "card": "#241747", "text": "#f3e8ff" }');
+  out("   Chaves: background, card, border, text, muted, track, accent, tools. Veja docs/modelos.md.");
   out("");
   out(instrucoesDeAgendamento({ stateDir: args["state-dir"] ? resolve(args["state-dir"]) : null, configPath: args.config ? arquivo : null }));
 }
@@ -457,7 +495,11 @@ async function executar({ cmd, args, home, paths, configPath, ctx, io, out }) {
       tema: args.theme ?? config?.theme ?? PADROES.theme,
       titulo: args.title ?? config?.title,
       idioma: args.lang ?? config?.lang ?? PADROES.lang,
+      modelo: args.model ?? config?.model ?? MODELO_PADRAO,
+      cores: config?.colors, // já validadas na carga da configuração (e de novo no renderizador)
+      coresEscuro: config?.colorsDark,
     };
+    if (!MODELOS.includes(o.modelo)) throw new Error(`--model deve ser ${MODELOS.join("|")}.`);
     if (!TEMAS.includes(o.tema)) throw new Error(`--theme deve ser ${TEMAS.join("|")}.`);
     if (!IDIOMAS.includes(o.idioma)) throw new Error(`--lang deve ser ${IDIOMAS.join("|")}.`);
     if (o.titulo !== undefined) validarTitulo(o.titulo, home); // até 60, sem controle, mesma barreira de privacidade
@@ -470,7 +512,11 @@ async function executar({ cmd, args, home, paths, configPath, ctx, io, out }) {
   }
 
   if (cmd === "render") {
-    return etapaRender({ jsonPath: resolve(args.input ?? paths.json), svgPath: resolve(args.out ?? paths.svg), opcoes: opcoesSvg(), home, out });
+    if (args.out && args["out-dir"]) throw new Error("Use --out (um arquivo só) OU --out-dir (os 4 SVGs numa pasta), não os dois.");
+    const jsonPath = resolve(args.input ?? paths.json);
+    if (args.out) return etapaRender({ jsonPath, svgPath: resolve(args.out), opcoes: opcoesSvg(), home, out });
+    const dir = resolve(args["out-dir"] ?? paths.saida);
+    return etapaRender({ jsonPath, svgPath: join(dir, "metrics.svg"), dirModelos: dir, opcoes: opcoesSvg(), home, out });
   }
 
   if (cmd === "publish") {
@@ -483,7 +529,7 @@ async function executar({ cmd, args, home, paths, configPath, ctx, io, out }) {
     exigirConfig();
     const o = opcoesSvg();
     await etapaExport({ adapters, ctx, home, config, destino: paths.json, paths, out });
-    await etapaRender({ jsonPath: paths.json, svgPath: paths.svg, opcoes: o, home, out });
+    await etapaRender({ jsonPath: paths.json, svgPath: paths.svg, dirModelos: paths.saida, opcoes: o, home, out });
     if (io.isTTY) {
       await etapaPublish({ config, paths, jsonPath: paths.json, home, yes: args.yes, dryRun: args["dry-run"], aceitaEmail: args["accept-public-email"], io, out, modo: "manual" });
       return;

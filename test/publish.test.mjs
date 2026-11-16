@@ -24,6 +24,7 @@ const ENV = {
 };
 Object.assign(process.env, ENV);
 
+const CINCO = ["metrics.json", "metrics.model-1.svg", "metrics.model-2.svg", "metrics.model-3.svg", "metrics.svg"]; // ordem alfabética
 const pastas = [];
 after(async () => {
   for (const p of pastas) await rm(p, { recursive: true, force: true });
@@ -96,13 +97,13 @@ test("publish: recusa sem confirmação (resposta 'n' no prompt e sem --yes fora
 
 const TTY_SEM_PERGUNTA = { isTTY: true, ask: async () => assert.fail("não deveria perguntar") };
 
-test("publish --yes: envia só metrics.json e metrics.svg, com mensagem fixa, e registra o publish manual (só em terminal interativo)", async () => {
+test("publish --yes: envia só os 5 arquivos (metrics.json, metrics.svg e os 3 metrics.model-N.svg), com mensagem fixa, e registra o publish manual (só em terminal interativo)", async () => {
   const a = await ambiente();
   await gravarJson(a.paths, await metricasSinteticas());
   await a.cmd(["publish", "--yes"], TTY_SEM_PERGUNTA);
   assert.deepEqual(commitsNoRemoto(a.remoto), ["chore(metrics): update AI usage metrics"]);
   const arquivos = gitRemoto(a.remoto, "ls-tree", "-r", "--name-only", "main").split("\n").sort();
-  assert.deepEqual(arquivos, ["metrics.json", "metrics.svg"]);
+  assert.deepEqual(arquivos, CINCO);
   const svg = gitRemoto(a.remoto, "show", "main:metrics.svg");
   assert.match(svg, /<title id="ttl">Meu painel<\/title>/);
   assert.doesNotMatch(svg, /<script/);
@@ -127,7 +128,7 @@ test("publish com prompt interativo respondendo 's' envia; segundo envio com dad
   assert.match(a.texto(), /\[alterado: \+\d+ -\d+ linhas\]/);
   await a.cmd(["publish", "--yes"]);
   assert.equal(commitsNoRemoto(a.remoto).length, 2);
-  assert.deepEqual(gitRemoto(a.remoto, "ls-tree", "-r", "--name-only", "main").split("\n").sort(), ["metrics.json", "metrics.svg"]);
+  assert.deepEqual(gitRemoto(a.remoto, "ls-tree", "-r", "--name-only", "main").split("\n").sort(), CINCO);
 
   // publicar de novo exatamente o mesmo conteúdo não cria commit vazio
   await a.cmd(["publish", "--yes"]);

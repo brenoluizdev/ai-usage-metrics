@@ -2,12 +2,14 @@
 import { chmod, lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, parse, resolve } from "node:path";
+import { ADAPTERS } from "./adapters/index.mjs";
+import { validarCores } from "./cores.mjs";
 import { lerAllowlist, validarTitulo } from "./privacy.mjs";
-import { IDIOMAS, TEMAS } from "./svg.mjs";
+import { IDIOMAS, MODELOS, TEMAS } from "./svg.mjs";
 
 export const PADROES = Object.freeze({ dataRepo: "ai-metrics", branch: "main", theme: "auto", lang: "en", autoPublish: false });
 
-const CHAVES = ["githubUser", "dataRepo", "branch", "remoteUrl", "publicProjects", "theme", "title", "lang", "autoPublish", "commitName", "commitEmail"];
+const CHAVES = ["githubUser", "dataRepo", "branch", "remoteUrl", "publicProjects", "theme", "title", "lang", "autoPublish", "commitName", "commitEmail", "model", "colors", "colorsDark"];
 const USUARIO_GITHUB = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const NOME_REPO = /^[A-Za-z0-9._-]{1,100}$/;
 const BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,60}$/;
@@ -23,6 +25,8 @@ export const caminhos = (stateDir) => ({
   saida: join(stateDir, "out"),
   json: join(stateDir, "out", "metrics.json"),
   svg: join(stateDir, "out", "metrics.svg"),
+  // um arquivo por modelo, para escolher pela URL sem rodar de novo: metrics.model-1.svg, metrics.model-2.svg, metrics.model-3.svg
+  svgsModelos: MODELOS.map((m) => join(stateDir, "out", `metrics.${m}.svg`)),
 });
 
 const mesmoCaminho = (a, b) => (process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b);
@@ -238,6 +242,16 @@ export function normalizarConfig(bruto) {
   if (c.title !== undefined) {
     try {
       validarTitulo(c.title);
+    } catch (e) {
+      throw new Error(`Configuração: ${e.message}`);
+    }
+  }
+  if (c.model !== undefined && !MODELOS.includes(c.model)) throw new Error(`Configuração: model deve ser ${MODELOS.join("|")}.`);
+  const idsFerramentas = ADAPTERS.map((a) => a.id);
+  for (const chave of ["colors", "colorsDark"]) {
+    if (c[chave] === undefined) continue;
+    try {
+      c[chave] = validarCores(c[chave], idsFerramentas, chave); // devolve o objeto normalizado (#rrggbb em minúsculas)
     } catch (e) {
       throw new Error(`Configuração: ${e.message}`);
     }
