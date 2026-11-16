@@ -16,7 +16,7 @@ import { renderTerminal } from "./report.mjs";
 import { exigirMetricasValidas } from "./schema.mjs";
 import { IDIOMAS, MODELOS, MODELO_PADRAO, TEMAS, gerarSvg } from "./svg.mjs";
 
-const COMANDOS = ["sources", "report", "export", "render", "publish", "init", "run", "restore"];
+const COMANDOS = ["sources", "report", "export", "render", "publish", "init", "run", "restore", "setup"];
 const BOOLEANAS = ["help", "yes", "dry-run", "overwrite", "accept-public-email", "non-interactive", "no-history"];
 const BIN = fileURLToPath(new URL("../bin/ai-usage-metrics.mjs", import.meta.url));
 
@@ -32,7 +32,10 @@ Comandos
   publish   DRY-RUN por padrão: mostra o que seria enviado ao seu repositório de dados
             (metrics.json, metrics.svg e metrics.model-1/2/3.svg);
             só envia com confirmação (--yes ou pergunta interativa)
-  init      cria a configuração local e imprime o trecho de README e o agendamento
+  setup     ASSISTENTE interativo (recomendado): guia do zero até o primeiro painel publicado e o agendamento diário.
+            Só roda num terminal; cada ação externa (gh, API do GitHub, criar repositório, restore, npm, agendador, publicar)
+            pede a sua confirmação [s/N]. Sem terminal, ou com --non-interactive, não faz nada: use o init
+  init      (automação/avançado) cria a configuração local por flags e imprime o trecho de README e o agendamento
   run       export -> render -> publish numa etapa (para o agendador)
   restore   computador novo: baixa o último metrics.json publicado no SEU repositório de dados e o grava como histórico local
             (history.json); é uma etapa de REDE e pede confirmação (--yes). --from-file <json> faz o mesmo 100% offline
@@ -99,6 +102,7 @@ async function* coletar(adapters, ctx) {
 /** Interação padrão no terminal. Injetável nos testes. */
 export function ioPadrao() {
   return {
+    padrao: true, // o "setup" troca este leitor por um que trata Ctrl+C/fim da entrada
     isTTY: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     async ask(pergunta) {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -339,7 +343,7 @@ export function aspasPosix(s) {
  * Valor do /TR do schtasks: cada argumento entre aspas duplas (a CRT do Windows lê "..." e barra+aspas). Barras invertidas
  * no fim do argumento são dobradas, senão barra+aspas fecharia a citação errada. Aspas duplas no argumento não têm como ser citadas.
  */
-function valorTR(args) {
+export function valorTR(args) {
   return args
     .map((a) => {
       if (/["\r\n\0]/.test(a) || /\p{Cc}/u.test(a)) throw new Error('um dos caminhos tem " ou caractere de controle');
@@ -351,10 +355,17 @@ function valorTR(args) {
 /** Escapa o valor para ir DENTRO de "..." numa linha de comando do Windows: barras antes de aspas dobram, aspas viram barra+aspas. */
 const escCRT = (v) => v.replace(/(\\*)"/g, '$1$1\\"');
 
+/** Horário HH:MM (00:00 a 23:59) que vai para o agendador; qualquer outra coisa é recusada. */
+export function exigirHorario(h) {
+  if (typeof h !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(h)) throw new Error("horário inválido (use HH:MM, de 00:00 a 23:59)");
+  return h;
+}
+
 /** schtasks digitado no cmd.exe: barra+aspas dentro de "...". Caracteres que o cmd interpreta fora de aspas (& | < > ^ % !) não são citáveis. */
-export function schtasksParaCmd(args) {
+export function schtasksParaCmd(args, horario = "12:00") {
+  exigirHorario(horario);
   for (const a of args) if (/[&|<>^%!]/.test(a)) throw new Error("um dos caminhos tem um destes caracteres, que o cmd.exe interpreta e não dá para citar: & | < > ^ % !");
-  return `schtasks /Create /SC DAILY /ST 12:00 /TN "ai-usage-metrics" /TR "${escCRT(valorTR(args))}"`;
+  return `schtasks /Create /SC DAILY /ST ${horario} /TN "ai-usage-metrics" /TR "${escCRT(valorTR(args))}"`;
 }
 
 /**
@@ -362,9 +373,10 @@ export function schtasksParaCmd(args) {
  * usamos Start-Process -ArgumentList com UMA string entre aspas simples (repassada crua, igual nas duas versões).
  * Só as aspas simples (inclusive as tipográficas, que o PowerShell também trata como aspas) precisam de tratamento: são dobradas.
  */
-export function schtasksParaPowerShell(args) {
+export function schtasksParaPowerShell(args, horario = "12:00") {
+  exigirHorario(horario);
   for (const a of args) if (a.includes("%")) throw new Error("um dos caminhos tem '%', que o Windows pode expandir como variável de ambiente e não dá para citar com segurança");
-  const inner = `/Create /SC DAILY /ST 12:00 /TN "ai-usage-metrics" /TR "${escCRT(valorTR(args))}"`;
+  const inner = `/Create /SC DAILY /ST ${horario} /TN "ai-usage-metrics" /TR "${escCRT(valorTR(args))}"`;
   return `Start-Process -FilePath schtasks -ArgumentList '${inner.replace(/['‘’‚‛]/g, (q) => q + q)}' -Wait -NoNewWindow`;
 }
 
@@ -373,14 +385,15 @@ export function schtasksParaPowerShell(args) {
  * --state-dir e é criado com umask 077 (modo 0600) no Linux/macOS.
  * @param {{ stateDir?: string|null, configPath?: string|null, node?: string, bin?: string }} [o]
  */
-export function instrucoesDeAgendamento({ stateDir = null, configPath = null, node = process.execPath, bin = BIN } = {}) {
+export function instrucoesDeAgendamento({ stateDir = null, configPath = null, node = process.execPath, bin = BIN, horario = "12:00" } = {}) {
+  exigirHorario(horario);
   const args = ["run", "--non-interactive"];
   if (stateDir) args.push("--state-dir", stateDir);
   if (configPath) args.push("--config", configPath);
   const todos = [node, bin, ...args];
   const gerar = (f) => {
     try {
-      return f(todos);
+      return f(todos, horario);
     } catch (e) {
       return `(comando não gerado para este shell) ${e.message}. Mova a pasta ou escolha outro --state-dir.`; // nunca imprime um comando que a shell expandiria ou quebraria
     }
@@ -390,7 +403,7 @@ export function instrucoesDeAgendamento({ stateDir = null, configPath = null, no
   let cron;
   try {
     const log = stateDir ? aspasPosix(`${stateDir.replace(/[\\/]+$/, "")}/run.log`) : '"$HOME/.ai-usage-metrics/run.log"';
-    cron = `0 12 * * * umask 077; ${todos.map(aspasPosix).join(" ")} >> ${log} 2>&1`.replace(/%/g, "\\%");
+    cron = `${Number(horario.slice(3))} ${Number(horario.slice(0, 2))} * * * umask 077; ${todos.map(aspasPosix).join(" ")} >> ${log} 2>&1`.replace(/%/g, "\\%");
   } catch (e) {
     cron = `(comando não gerado) ${e.message}`;
   }
@@ -536,8 +549,13 @@ export async function main(argv, out = console.log, io = ioPadrao()) {
   const configPath = resolve(args.config ?? paths.config);
   const ctx = { home, since: parseSince(args.since) };
 
-  if (["init", "export", "render", "publish", "run", "restore"].includes(cmd)) await validarStateDir(args["state-dir"] ?? paths.dir, { homes: [home] }); // a grafia CRUA é validada (resolve() esconderia ponto/espaço final)
+  if (["init", "export", "render", "publish", "run", "restore", "setup"].includes(cmd)) await validarStateDir(args["state-dir"] ?? paths.dir, { homes: [home] }); // a grafia CRUA é validada (resolve() esconderia ponto/espaço final)
   if (cmd === "init") return cmdInit({ args, paths, io, out });
+  if (cmd === "setup") {
+    // Assistente interativo: módulo próprio, carregado só quando usado. Recebe as etapas existentes (nada é duplicado).
+    const { cmdSetup } = await import("./setup.mjs");
+    return cmdSetup({ args, paths, configPath, home, io, out, etapas: { etapaExport, etapaRender, etapaPublish, cmdRestore, instrucoesDeAgendamento, schtasksParaCmd, valorTR, bin: BIN } });
+  }
 
   // Escritas na pasta de estado não podem rodar em paralelo (lockfile com detecção de trava velha).
   const liberar = ["export", "render", "publish", "run", "restore"].includes(cmd) ? await adquirirLock(paths.dir) : null;
