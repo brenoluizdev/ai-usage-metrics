@@ -57,16 +57,15 @@ O commit enviado ao seu repositório público leva um autor e um committer. A fe
   `"commitName": "Seu Nome", "commitEmail": "12345678+seu-usuario@users.noreply.github.com"`.
 - Se a opção "Block command line pushes that expose my email" estiver ligada na sua conta, o GitHub recusa pushes com e-mail privado: use o noreply.
 
-## Publicar o pacote no npm (quando for a hora)
+## Checklist de publicação no npm
 
-O pacote está com `"private": true` de propósito. Antes de publicar:
+O pacote está com `"private": true` de propósito, para evitar uma publicação acidental. Para publicar:
 
-1. Licença: **MIT** (arquivo `LICENSE` e campo `license` do `package.json` já preenchidos).
-2. `repository`, `bugs` e `homepage` já apontam para `github.com/brenoluizdev/ai-usage-metrics`: **o repositório foi criado vazio no GitHub com exatamente esse nome**. Ele ainda não recebeu nenhum push: decida o que fazer com o histórico antigo (e-mail pessoal nos commits) antes do primeiro envio. O nome `ai-usage-metrics` estava livre no npm em 2026-11-15; confira de novo na hora de publicar (ou use escopo).
-3. Remova `"private": true`.
-4. Rode `npm pack --dry-run` e confira a lista de arquivos (só `bin`, `src`, `docs`, `templates`, `examples`, `README.md`, `SECURITY.md`): nada de `.env`, `config.json`, `state.json`, `out/`, `repo/` ou logs.
-5. Ative **2FA** na conta do npm (de preferência exigido para publicar) e publique com `npm publish --provenance`. A proveniência só é gerada a partir de um CI suportado (por exemplo GitHub Actions com `id-token: write`); de uma máquina local o `--provenance` falha, e nesse caso publique sem ele, com 2FA, e registre isso.
-6. Fixe a versão publicada no template do Actions (`AI_USAGE_METRICS_VERSION`). As ações do template já estão fixadas por SHA de commit (resolvidas com `git ls-remote` nas tags `v4.2.2` e `v4.1.0`); ao atualizar uma ação, repita a consulta e troque o SHA.
+1. Confirme que o nome `ai-usage-metrics` está livre no npm (ou use um escopo).
+2. Remova `"private": true`.
+3. Rode `npm pack --dry-run` e confira a lista de arquivos (só `bin`, `src`, `docs`, `templates`, `examples`, `LICENSE`, `README.md`, `SECURITY.md` e `package.json`): nada de `.env`, `config.json`, `state.json`, `out/`, `repo/` ou logs.
+4. Ative **2FA** na conta do npm (de preferência exigido para publicar) e publique com `npm publish --provenance`. A proveniência só é gerada a partir de um CI suportado (por exemplo GitHub Actions com `id-token: write`); de uma máquina local o `--provenance` falha, e nesse caso publique sem ele, com 2FA, e registre isso.
+5. Fixe a versão publicada no template do Actions (`AI_USAGE_METRICS_VERSION`). As ações do template já estão fixadas por SHA de commit (resolvidas com `git ls-remote` nas tags `v4.2.2` e `v4.1.0`); ao atualizar uma ação, repita a consulta e troque o SHA.
 
 ## Riscos que continuam com você
 
@@ -75,7 +74,6 @@ O pacote está com `"private": true` de propósito. Antes de publicar:
 - **O envio agendado falha enquanto houver uma pasta `repo` que não é nossa** (por exemplo, clone de uma versão anterior da ferramenta, sem marcador), sem alterar nada, até um humano renomear/mover essa pasta ou escolher outro `--state-dir`.
 - O `~/.gitconfig` (e o `/etc/gitconfig`) continuam valendo: `url.<x>.insteadOf`/`pushInsteadOf`, `credential.helper`, `core.sshCommand` e afins são seus e a ferramenta não os desativa. O dry-run mostra a URL **aprovada**, mas o git pode reescrevê-la (um `insteadOf` global pode levar o push a outro destino). Confira o seu `git config --global --list` antes do primeiro envio.
 - O histórico de um repositório público é permanente e pode ser clonado. Confira o dry-run antes do primeiro envio.
-- Os commits anteriores deste repositório de código (a ferramenta) têm o e-mail pessoal do autor no histórico local. Isso não é o repositório de dados, mas, se um dia o código for público, o histórico será público: o histórico **não foi reescrito**. Os commits novos deste repositório usam a identidade noreply do GitHub (configurada só localmente, com `git config user.name` e `git config user.email`). **Os commits antigos continuam com o e-mail pessoal**: o dono decide se reescreve o histórico antes de tornar o código público (ou se publica o código com um histórico novo).
 - Datas, volume de uso e ranking são informação pública, mesmo com projetos anonimizados. Pouca atividade em um dia pode revelar rotina.
 - O nome público de um projeto pode revelar trabalho confidencial: só inclua o que você já divulga.
 - Os números são autodeclarados e aproximados.
