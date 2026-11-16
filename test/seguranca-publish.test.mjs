@@ -156,6 +156,32 @@ test("remoto com metrics.json como link simbólico (modo 120000) é recusado e n
   assert.equal(commits(a.remoto).length, antes);
 });
 
+for (const nome of ["metrics.svg", "metrics.model-1.svg", "metrics.model-2.svg", "metrics.model-3.svg"]) {
+  test(`remoto com ${nome} como link simbólico (modo 120000) é recusado e nada é enviado`, async () => {
+    const a = await ambiente();
+    const trab = await tmp("ai-usage-metrics-trab-");
+    git(trab, "init", "-q", "-b", "main");
+    const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: trab, input: "alvo-fora-do-clone", encoding: "utf8", env: process.env }).trim();
+    git(trab, "update-index", "--add", "--cacheinfo", `120000,${blob},${nome}`);
+    git(trab, "commit", "-q", "-m", "x", "--no-verify");
+    git(trab, "push", "-q", a.remoto, "main");
+    const antes = commits(a.remoto).length;
+    await assert.rejects(a.cmd(["publish", "--yes"], TTY()), /não são arquivos comuns|link simbólico/);
+    assert.equal(commits(a.remoto).length, antes);
+  });
+}
+
+test("escreverAtomico: os 5 arquivos publicados são gravados por inteiro, sem temporários", async () => {
+  const dir = await tmp("ai-usage-metrics-atomico5-");
+  const nomes = ["metrics.json", "metrics.svg", "metrics.model-1.svg", "metrics.model-2.svg", "metrics.model-3.svg"];
+  for (const n of nomes) {
+    await escreverAtomico(dir, n, "um");
+    await escreverAtomico(dir, n, "dois");
+    assert.equal(await readFile(join(dir, n), "utf8"), "dois", n);
+  }
+  assert.deepEqual((await readdir(dir)).sort(), [...nomes].sort());
+});
+
 test("escreverAtomico: recusa symlink no destino, não deixa temporários e troca o conteúdo por inteiro", async (t) => {
   const dir = await tmp("ai-usage-metrics-atomico-");
   await escreverAtomico(dir, "metrics.json", "um");

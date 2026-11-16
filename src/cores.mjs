@@ -23,6 +23,9 @@ export function normalizarHex(valor, rotulo = "cor") {
 
 const ehObjetoSimples = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
 
+/** Texto vindo da config para uma mensagem de erro: limitado e sem caracteres de controle (ESC/OSC não chegam ao terminal). */
+const paraMensagem = (s) => String(s).slice(0, 40).replace(/[\u0000-\u001f\u007f-\u009f]/g, "?");
+
 /**
  * Valida um objeto de cores (`colors` ou `colorsDark`). Chaves desconhecidas e ids de ferramenta fora de `idsValidos` são recusados.
  * Devolve um objeto NOVO, normalizado, só com o que foi informado: { background?, ..., tools?: {id: "#rrggbb"} }.
@@ -34,7 +37,7 @@ export function validarCores(obj, idsValidos, nome = "colors") {
   if (!ehObjetoSimples(obj)) throw new Error(`${nome}: esperado um objeto, por exemplo {"accent": "#22c55e"}.`);
   const saida = {};
   for (const k of Object.keys(obj)) {
-    if (!CHAVES_COR.includes(k)) throw new Error(`${nome}: chave desconhecida "${String(k).slice(0, 40)}". Permitidas: ${CHAVES_COR.join(", ")}.`);
+    if (!CHAVES_COR.includes(k)) throw new Error(`${nome}: chave desconhecida "${paraMensagem(k)}". Permitidas: ${CHAVES_COR.join(", ")}.`);
   }
   for (const k of CHAVES_SIMPLES) {
     if (Object.hasOwn(obj, k)) saida[k] = normalizarHex(obj[k], `${nome}.${k}`);
@@ -43,7 +46,7 @@ export function validarCores(obj, idsValidos, nome = "colors") {
     if (!ehObjetoSimples(obj.tools)) throw new Error(`${nome}.tools: esperado um objeto {"id-da-ferramenta": "#rrggbb"}.`);
     const ferramentas = Object.create(null);
     for (const id of Object.keys(obj.tools)) {
-      if (!idsValidos.includes(id)) throw new Error(`${nome}.tools: ferramenta desconhecida "${String(id).slice(0, 40)}". Ids válidos: ${idsValidos.join(", ")}.`);
+      if (!idsValidos.includes(id)) throw new Error(`${nome}.tools: ferramenta desconhecida "${paraMensagem(id)}". Ids válidos: ${idsValidos.join(", ")}.`);
       ferramentas[id] = normalizarHex(obj.tools[id], `${nome}.tools.${id}`);
     }
     saida.tools = ferramentas;

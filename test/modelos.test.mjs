@@ -207,6 +207,20 @@ test("cores: aceita #rgb e #rrggbb (maiúsculas e minúsculas) e normaliza para 
   assert.deepEqual(validarCores({}, IDS), {});
 });
 
+test("cores: mensagens de erro não deixam caracteres de controle (ESC/OSC) chegarem ao terminal", () => {
+  const hostil = "x\u001b[31mVERMELHO\u001b]0;titulo\u0007y";
+  for (const obj of [{ [hostil]: "#fff" }, { tools: { [hostil]: "#fff" } }]) {
+    let msg = "";
+    try {
+      validarCores(obj, IDS);
+    } catch (e) {
+      msg = e.message;
+    }
+    assert.ok(msg.length > 0, "o valor hostil deve ser recusado");
+    assert.doesNotMatch(msg, /[\u0000-\u001f\u007f-\u009f]/, "nenhum caractere de controle na mensagem");
+  }
+});
+
 for (const chave of ["background", "card", "border", "text", "muted", "track", "accent"]) {
   test(`cores: ${chave} recusa tudo que não é #rgb/#rrggbb (injeção, comentários, funções, tipos errados)`, () => {
     for (const ruim of INVALIDAS) {
