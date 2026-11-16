@@ -125,7 +125,7 @@ test("fluxo feliz com gh simulado: grava a config válida, executa as ações ma
   const { ext, chamadas } = extFeliz();
   const r = await rodar({ amb, ext, regras: FELIZ, argv: [] });
   assert.deepEqual(CHAMADAS_EXTERNAS(chamadas), ["ghUsuario", "ghRepo", "tarefaExiste", "ghCriarRepo", "tarefaExiste", "criarTarefa"]);
-  assert.deepEqual(chamadas.find((c) => c[0] === "ghCriarRepo").slice(1), ["usuario-teste", "ai-metrics"]);
+  assert.deepEqual(chamadas.find((c) => c[0] === "ghCriarRepo").slice(1, 3), ["usuario-teste", "ai-metrics"]);
   const cfg = await lerConfig(amb.config);
   assert.equal(cfg.githubUser, "usuario-teste");
   assert.equal(cfg.commitName, "usuario-teste");

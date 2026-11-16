@@ -2,17 +2,19 @@
 // Regras: só roda em terminal; CADA ação externa tem a sua confirmação [s/N] (padrão N); nada é gravado em disco antes do
 // resumo final (exceto as prévias locais em <state-dir>/out/preview/); nenhum token é lido, pedido, guardado ou impresso.
 // As funções externas (gh, API, npm, schtasks, navegador) vêm de `ambiente.mjs` e são injetáveis (io.externos) nos testes.
-import { chmod, copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { chmod, copyFile, lstat, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { ADAPTERS } from "./adapters/index.mjs";
 import { aggregate, porAtividade, resumo, SEM_PROJETO } from "./aggregate.mjs";
-import { binDoRuntime, externosPadrao, idValido, instalacaoInstavel, limparTexto, NOME_TAREFA, pastaDoRuntime, repoValido, usuarioValido } from "./ambiente.mjs";
+import { binDoRuntime, externosPadrao, idValido, instalacaoInstavel, limparTexto, NOME_TAREFA, nodeInstavel, pastaDoRuntime, REGISTRO_NPM, repoValido, usuarioValido } from "./ambiente.mjs";
 import { PADROES, lerConfig, normalizarConfig, urlDoRemoto } from "./config.mjs";
 import { validarCores, misturar, PADRAO_CLARO } from "./cores.mjs";
 import { adquirirLock } from "./lock.mjs";
 import { garantirSvgSemVazamento, lerAllowlist, validarAlias, validarTitulo } from "./privacy.mjs";
+import { exigirArquivoSeguro } from "./publish.mjs";
 import { toPublic } from "./public.mjs";
 import { exigirMetricasValidas } from "./schema.mjs";
 import { IDIOMAS, MODELOS, MODELO_PADRAO, TEMAS, gerarSvg } from "./svg.mjs";
@@ -58,7 +60,7 @@ export const PALETAS = Object.freeze([
 // ---------- entrada interativa (Ctrl+C / fim da entrada tratados) ----------
 
 /** Leitor de linhas com UM readline para a sessão toda. Ctrl+C e Ctrl+D encerram com SetupCancelado. */
-export function ioInterativo(input = process.stdin, output = process.stdout) {
+export function ioInterativo(input = process.stdin, output = process.stdout, { aoCancelar = () => {} } = {}) {
   const rl = createInterface({ input, output });
   let fechado = false;
   const aguardando = new Set();
@@ -67,7 +69,10 @@ export function ioInterativo(input = process.stdin, output = process.stdout) {
     for (const rej of aguardando) rej(new SetupCancelado("entrada encerrada"));
     aguardando.clear();
   });
-  rl.on("SIGINT", () => rl.close());
+  rl.on("SIGINT", () => {
+    aoCancelar(); // aborta a ação externa em andamento (se houver) ANTES de fechar a entrada
+    rl.close();
+  });
   return {
     ask(pergunta) {
       if (fechado) return Promise.reject(new SetupCancelado("entrada encerrada"));
@@ -123,10 +128,41 @@ export async function gravarAtomico(arquivo, texto) {
   }
 }
 
+/** Escrita das prévias: recusa destino que seja link simbólico ou não seja arquivo comum (mesma checagem do publish). */
 async function gravarSimples(arquivo, texto) {
   await mkdir(resolve(arquivo, ".."), { recursive: true, mode: 0o700 });
+  await exigirArquivoSeguro(arquivo);
   await writeFile(arquivo, texto, { encoding: "utf8", mode: 0o600 });
   await chmod(arquivo, 0o600).catch(() => {});
+}
+
+const MAX_COPIAS = 5;
+
+/**
+ * Cópia de segurança da configuração atual SEM sobrescrever cópias anteriores: config.json.bak, .bak.1, .bak.2...
+ * Só as 5 mais recentes (por data) são mantidas; a poda apaga apenas arquivos comuns com esses nomes exatos.
+ * Devolve o caminho da cópia nova.
+ */
+export async function copiaDeSeguranca(arquivo) {
+  const dir = resolve(arquivo, "..");
+  const base = basename(arquivo);
+  const nomes = (await readdir(dir)).filter((n) => n === `${base}.bak` || new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.bak\\.\\d{1,6}$`).test(n));
+  const maior = nomes.reduce((m, n) => Math.max(m, n === `${base}.bak` ? 0 : Number(n.split(".").pop())), -1);
+  const destino = join(dir, maior < 0 ? `${base}.bak` : `${base}.bak.${maior + 1}`);
+  await exigirArquivoSeguro(arquivo); // a configuração em si também não pode ser link
+  await exigirArquivoSeguro(destino);
+  await copyFile(arquivo, destino, constants.COPYFILE_EXCL);
+  await chmod(destino, 0o600).catch(() => {});
+  const todas = [];
+  for (const n of [...nomes, basename(destino)]) {
+    const p = join(dir, n);
+    const st = await lstat(p).catch(() => null);
+    if (st?.isFile() && !st.isSymbolicLink()) todas.push([p, st.mtimeMs]);
+  }
+  // A cópia recém-criada sempre fica; das outras, as (MAX_COPIAS - 1) mais recentes por data.
+  const outras = todas.filter(([p]) => p !== destino).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? 1 : -1));
+  for (const [p] of outras.slice(MAX_COPIAS - 1)) await rm(p, { force: true });
+  return destino;
 }
 
 const existe = (p) => stat(p).then(() => true, () => false);
@@ -161,7 +197,7 @@ async function* coletar(adapters, ctx) {
 }
 
 /** Cria (ou substitui) a tarefa diária pelo MESMO código que o teste real usa: comando validado pela ferramenta + schtasks via execFile. */
-export async function criarTarefaAgendada({ etapas, ext, nome = NOME_TAREFA, horario, node, bin, argsExtras = [], substituir = false, limite = LIMITE_TR }) {
+export async function criarTarefaAgendada({ etapas, ext, nome = NOME_TAREFA, horario, node, bin, argsExtras = [], substituir = false, limite = LIMITE_TR, signal }) {
   const todos = [node, bin, "run", "--non-interactive", ...argsExtras];
   try {
     etapas.schtasksParaCmd(todos, horario); // validação existente: recusa " e os caracteres que o cmd.exe interpretaria
@@ -170,7 +206,7 @@ export async function criarTarefaAgendada({ etapas, ext, nome = NOME_TAREFA, hor
   }
   const tr = etapas.valorTR(todos);
   if (tr.length > limite) return { ok: false, motivo: `o comando da tarefa tem ${tr.length} caracteres e o Agendador do Windows aceita no máximo ${LIMITE_TR} em /TR; use um --state-dir e uma instalação com caminhos mais curtos` };
-  const r = await ext.criarTarefa({ nome, horario, tr, substituir });
+  const r = await ext.criarTarefa({ nome, horario, tr, substituir, signal });
   return { ...r, tr };
 }
 
@@ -183,7 +219,10 @@ export async function cmdSetup({ args, paths, configPath, home, io, out, etapas 
     return;
   }
   const usaPadrao = io.padrao === true;
-  const leitor = usaPadrao ? ioInterativo() : null;
+  // Ctrl+C durante uma ação externa (npm, gh, schtasks...) aborta o filho e impede as ações seguintes.
+  const controle = new AbortController();
+  io.registrarCancelamento?.(() => controle.abort()); // testes: dispara o cancelamento sem terminal
+  const leitor = usaPadrao ? ioInterativo(process.stdin, process.stdout, { aoCancelar: () => controle.abort() }) : null;
   const ioReal = leitor ? { ...io, ask: leitor.ask, fechar: leitor.fechar } : io;
   const amb = {
     plataforma: process.platform,
@@ -195,12 +234,13 @@ export async function cmdSetup({ args, paths, configPath, home, io, out, etapas 
   };
   amb.versao ??= JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")).version;
   const ext = io.externos ?? externosPadrao();
+  const assistente = new Assistente({ args, paths, configPath, home, io: ioReal, out, etapas, amb, ext, sinal: controle.signal });
   try {
-    await new Assistente({ args, paths, configPath, home, io: ioReal, out, etapas, amb, ext }).executar();
+    await assistente.executar();
   } catch (e) {
     if (!(e instanceof SetupCancelado)) throw e;
     out("");
-    out(`Assistente encerrado (${e.message || "cancelado"}). Nada pela metade: a configuração só é gravada depois da confirmação do resumo.`);
+    out(`Assistente encerrado (${e.message || "cancelado"}). ${assistente.gravou ? "A configuração JÁ tinha sido gravada (veja acima o que foi e o que não foi executado)." : "Nada foi gravado: a configuração só é gravada depois da confirmação do resumo."}`);
   } finally {
     leitor?.fechar();
   }
@@ -385,7 +425,7 @@ class Assistente {
         validar: (v) => (usuarioValido(v) ? { ok: true, valor: v } : { ok: false, erro: "Usuário inválido (letras, números e hífen, até 39 caracteres)." }),
       });
       id = d.commitEmail && login.toLowerCase() === String(d.githubUser).toLowerCase() ? idDoNoreply(d.commitEmail, login) : null;
-      if (!id && (await this.sim(`Consultar a API pública do GitHub (um GET em https://api.github.com/users/${login}, sem credenciais) para descobrir o seu ID numérico?`))) {
+      if (!id && (await this.sim(`Consultar a API pública do GitHub (um GET em https://api.github.com/users/${login}, sem credenciais; o GitHub verá o seu IP; proxy só com NODE_USE_ENV_PROXY=1) para descobrir o seu ID numérico?`))) {
         const r = await ext.apiUsuario(login);
         if (r.estado === "ok" && usuarioValido(r.login) && idValido(r.id)) {
           login = r.login;
@@ -408,7 +448,7 @@ class Assistente {
     }
     const mudouUsuario = d.githubUser && d.githubUser.toLowerCase() !== login.toLowerCase();
     if (d.commitEmail && !ehNoreply(d.commitEmail) && !mudouUsuario) {
-      out(`  Mantido o commitEmail personalizado da configuração atual (o assistente nunca grava outro e-mail pessoal): ${d.commitEmail}`);
+      out(`  Mantido o commitEmail personalizado da configuração atual (o assistente nunca grava outro e-mail pessoal): ${limparTexto(d.commitEmail, 100)}`);
     } else {
       if (d.commitEmail && !ehNoreply(d.commitEmail)) out(this.aviso("  O commitEmail personalizado anterior foi removido porque o usuário mudou."));
       d.githubUser = login;
@@ -422,7 +462,7 @@ class Assistente {
     }
     d.githubUser = login;
     d.githubId = id;
-    out(`  Autor do commit: ${d.commitName ?? login} <${d.commitEmail ?? emailNoreply(login, null)}>`);
+    out(`  Autor do commit: ${limparTexto(d.commitName ?? login, 100)} <${limparTexto(d.commitEmail ?? emailNoreply(login, null), 100)}>`);
   }
 
   // 3) repositório de dados
@@ -440,7 +480,7 @@ class Assistente {
     let r = null;
     if (this.gh) {
       if (await this.sim(`Consultar o repositório com \`gh repo view ${alvo}\` (rede, via gh)?`)) r = await ext.ghRepo(d.githubUser, d.dataRepo);
-    } else if (await this.sim(`Consultar a API pública do GitHub (GET https://api.github.com/repos/${alvo}, sem credenciais; um repositório privado aparece como inexistente)?`)) {
+    } else if (await this.sim(`Consultar a API pública do GitHub (GET https://api.github.com/repos/${alvo}, sem credenciais; o GitHub verá o seu IP; um repositório privado aparece como inexistente)?`)) {
       r = await ext.apiRepo(d.githubUser, d.dataRepo);
     }
     if (r?.estado === "existe" && r.privado === false) {
@@ -665,10 +705,19 @@ class Assistente {
       d.semTarefa = true;
       return;
     }
+    if (nodeInstavel(amb.node)) {
+      out(this.aviso(`  Aviso: o Node em uso (${limparTexto(amb.node, 120)}) parece vir de um gerenciador de versões (nvm/fnm/volta/asdf/pasta de versão). O schtasks grava ESTE caminho; se a versão for trocada ou removida, a tarefa deixa de funcionar e precisa ser recriada (rode o setup de novo).`));
+    }
     if (instavel) {
       out(this.aviso(`  O pacote está rodando de um cache temporário (${limparTexto(amb.bin, 100)}). Uma tarefa apontando para lá QUEBRARIA quando o cache for limpo.`));
       const alvo = pastaDoRuntime(this.home);
-      if (await this.sim(`Instalar uma cópia fixa na versão ${amb.versao} em ${alvo} com \`npm install --prefix\` (REDE: baixa do registro do npm) e agendar a partir dela?`)) {
+      out(`  Instalar a cópia fixa significa: \`npm install --prefix ${alvo} ai-usage-metrics@${amb.versao} --registry ${REGISTRO_NPM} --ignore-scripts\` (REDE).`);
+      out("  Entenda antes de aceitar:");
+      out("   - esse código será executado TODO DIA pelo Agendador do Windows, com os seus privilégios;");
+      out("   - o npm filho lê o seu ~/.npmrc (credenciais e configuração do npm), mesmo que variáveis como NPM_TOKEN não sejam repassadas; o registro usado é o npmjs.org, passado explicitamente;");
+      out("   - não há integridade fixada além do que o registro e o publicador do pacote garantem;");
+      out(`   - a pasta ${alvo} é código alterável por qualquer processo do seu usuário (risco equivalente ao da própria tarefa agendada).`);
+      if (await this.sim(`Instalar a cópia fixa (ai-usage-metrics versão ${amb.versao}) em ${alvo} e agendar a partir dela?`)) {
         d.instalarRuntime = true;
         d.binAgenda = binDoRuntime(this.home);
       } else {
@@ -681,6 +730,8 @@ class Assistente {
       d.criarTarefa = true;
       if (await this.ext.tarefaExiste(NOME_TAREFA)) {
         out(this.aviso(`  Já existe uma tarefa "${NOME_TAREFA}".`));
+        const atual = await this.ext.tarefaAtual?.(NOME_TAREFA);
+        out(`  Ela executa hoje: ${atual ? limparTexto(atual, 300) : "(não consegui ler)"}`);
         d.substituirTarefa = await this.sim("Substituir a tarefa existente?");
         if (!d.substituirTarefa) d.criarTarefa = false;
       }
@@ -700,7 +751,7 @@ class Assistente {
     this.config = config;
     const nomes = Object.values(lerAllowlistSegura(config, this.home));
     out(`  Usuário/repositório: ${config.githubUser}/${config.dataRepo} (${d.repoEstado ?? "mantido"})`);
-    out(`  Autor do commit: ${config.commitName ?? config.githubUser} <${config.commitEmail ?? emailNoreply(config.githubUser, null)}>`);
+    out(`  Autor do commit: ${limparTexto(config.commitName ?? config.githubUser, 100)} <${limparTexto(config.commitEmail ?? emailNoreply(config.githubUser, null), 100)}>`);
     out(`  Projetos com nome público: ${nomes.length ? nomes.join(", ") : "nenhum (todos anonimizados)"}`);
     out(`  Modelo ${config.model}, idioma ${config.lang}, tema ${config.theme}, título ${config.title ? `"${config.title}"` : "padrão"}`);
     out(`  Cores: ${config.colors || config.colorsDark ? "personalizadas" : "padrão"}; autoPublish: ${config.autoPublish ? "ligado" : "desligado"}`);
@@ -715,58 +766,93 @@ class Assistente {
       out("Nada foi gravado nem executado (só as prévias locais em out/preview). Rode `setup` de novo quando quiser.");
       return false;
     }
+    // A reconfirmação de SUBSTITUIR a tarefa vem ANTES do lock: nenhuma pergunta fica com a pasta de estado travada (o `run` agendado não falha por horas).
+    if (d.criarTarefa && d.substituirTarefa && (await this.ext.tarefaExiste(NOME_TAREFA))) {
+      const atual = await this.ext.tarefaAtual?.(NOME_TAREFA);
+      out(`  Tarefa atual "${NOME_TAREFA}" executa: ${atual ? limparTexto(atual, 300) : "(não consegui ler)"}`);
+      if (!(await this.sim(`Reconfirmando: SUBSTITUIR a tarefa existente "${NOME_TAREFA}"?`))) {
+        d.criarTarefa = false;
+        d.substituirTarefa = false;
+        out("  Tarefa existente mantida (nada será alterado no agendador).");
+      }
+    }
     await this.executarAcoes(config);
     return true;
   }
 
+  /** Ctrl+C: diz o que já foi feito e o que NÃO foi, e interrompe (as ações seguintes não executam). */
+  checar(feito, pendentes) {
+    if (!this.sinal?.aborted) return;
+    this.out("");
+    this.out(this.aviso(`Interrompido (Ctrl+C). Já feito: ${feito.length ? feito.join("; ") : "nada"}. NÃO executado: ${pendentes.length ? pendentes.join("; ") : "nada pendente"}.`));
+    throw new SetupCancelado("cancelado durante uma ação externa");
+  }
+
   async executarAcoes(config) {
-    const { out, d, ext } = this;
+    const { out, d, ext, sinal } = this;
     this.pronto = true; // a publicação só segue se o destino existir
+    const feito = [];
+    const todas = [];
+    if (d.criarRepo) todas.push("criar o repositório");
+    if (d.restore) todas.push("restore do histórico");
+    if (d.instalarRuntime) todas.push("npm install da cópia fixa");
+    if (d.criarTarefa) todas.push("criar a tarefa agendada");
+    const pend = () => todas.filter((t) => !feito.includes(t)); // o que falhou ou foi cancelado conta como NÃO executado
     await this.comLock(async () => {
       if (await existe(this.configPath)) {
-        await copyFile(this.configPath, `${this.configPath}.bak`);
-        await chmod(`${this.configPath}.bak`, 0o600).catch(() => {});
+        const bak = await copiaDeSeguranca(this.configPath);
+        out(`Cópia da configuração anterior: ${bak}`);
       }
       await gravarAtomico(this.configPath, JSON.stringify(config, null, 2) + "\n");
+      this.gravou = true;
+      feito.push("gravar a configuração");
       out(`Configuração gravada em ${this.configPath}`);
+      this.checar(feito, pend());
       if (d.criarRepo) {
-        const r = await ext.ghCriarRepo(config.githubUser, config.dataRepo);
-        if (r.ok) out(`Repositório público ${config.githubUser}/${config.dataRepo} criado (vazio).`);
-        else {
+        const r = await ext.ghCriarRepo(config.githubUser, config.dataRepo, { signal: sinal });
+        if (r.ok) {
+          feito.push("criar o repositório");
+          out(`Repositório público ${config.githubUser}/${config.dataRepo} criado (vazio).`);
+        } else {
           this.pronto = false;
           out(this.aviso(`Não consegui criar o repositório (${limparTexto(r.motivo ?? "erro", 160)}). Crie-o à mão em https://github.com/new (público, vazio) antes de publicar.`));
         }
+        this.checar(feito, pend());
       }
       if (d.restore) {
         try {
           await this.etapas.cmdRestore({ args: { yes: true }, config, paths: this.paths, home: this.home, io: this.io, out });
+          feito.push("restore do histórico");
         } catch (e) {
           out(this.aviso(`restore não concluído: ${limparTexto(e.message, 200)}`));
         }
+        this.checar(feito, pend()); // o git do restore não é abortável no meio: o Ctrl+C vale ao terminar
       }
       let bin = d.binAgenda;
       if (d.instalarRuntime) {
-        const r = await ext.npmInstalar({ prefixo: pastaDoRuntime(this.home), versao: this.amb.versao });
+        const r = await ext.npmInstalar({ prefixo: pastaDoRuntime(this.home), versao: this.amb.versao, signal: sinal });
         if (r.ok) {
           bin = r.bin;
+          feito.push("npm install da cópia fixa");
           out(`Cópia fixa instalada em ${pastaDoRuntime(this.home)}.`);
         } else {
           d.criarTarefa = false;
           out(this.aviso(`Não consegui instalar a cópia fixa (${limparTexto(r.motivo ?? "erro", 160)}); a tarefa NÃO foi criada.`));
         }
+        this.checar(feito, pend());
       }
       if (d.criarTarefa) {
-        let substituir = false;
-        if (await ext.tarefaExiste(NOME_TAREFA)) {
-          substituir = d.substituirTarefa === true && (await this.sim(`Reconfirmando: SUBSTITUIR a tarefa existente "${NOME_TAREFA}"?`));
-          if (!substituir) {
-            out("Tarefa existente mantida (nada foi alterado no agendador).");
-            return;
-          }
+        // Só confere de novo (sem perguntar): se apareceu uma tarefa depois da confirmação e o usuário não aceitou substituir, mantém a existente.
+        const existente = await ext.tarefaExiste(NOME_TAREFA);
+        if (existente && d.substituirTarefa !== true) {
+          out("Tarefa existente mantida (nada foi alterado no agendador).");
+          return;
         }
-        const r = await criarTarefaAgendada({ etapas: this.etapas, ext, horario: d.horario, node: this.amb.node, bin, argsExtras: d.argsExtras, substituir, limite: this.amb.limiteTr });
+        const r = await criarTarefaAgendada({ etapas: this.etapas, ext, horario: d.horario, node: this.amb.node, bin, argsExtras: d.argsExtras, substituir: existente, limite: this.amb.limiteTr, signal: sinal });
+        if (r.ok) feito.push("criar a tarefa agendada");
         out(r.ok ? `Tarefa "${NOME_TAREFA}" criada: diária às ${d.horario}.` : this.aviso(`Não consegui criar a tarefa (${limparTexto(r.motivo ?? "erro", 200)}). Use as instruções impressas ao final.`));
         if (!r.ok) d.tarefaFalhou = true;
+        this.checar(feito, pend());
       }
     });
   }

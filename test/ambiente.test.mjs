@@ -115,7 +115,7 @@ test("npm: node + npm-cli.js (sem shell), versão fixa, --ignore-scripts; versã
   if (cli) {
     const r = await ext.npmInstalar({ prefixo: "C:\\x\\runtime", versao: "0.2.0" });
     assert.equal(chamadas[0].cmd, process.execPath);
-    assert.deepEqual(chamadas[0].args.slice(1), ["install", "--prefix", "C:\\x\\runtime", "ai-usage-metrics@0.2.0", "--no-audit", "--no-fund", "--ignore-scripts", "--loglevel=error"]);
+    assert.deepEqual(chamadas[0].args.slice(1), ["install", "--prefix", "C:\\x\\runtime", "ai-usage-metrics@0.2.0", "--registry", "https://registry.npmjs.org/", "--no-audit", "--no-fund", "--ignore-scripts", "--loglevel=error"]);
     assert.equal(chamadas[0].opts.shell, false);
     assert.equal(r.ok, false); // o fake não instalou nada: o executável esperado não existe
   }
