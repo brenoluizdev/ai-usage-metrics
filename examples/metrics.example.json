@@ -1,0 +1,2796 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-06-04T12:00:00.000Z",
+  "synthetic": true,
+  "period": {
+    "from": "2026-01-05",
+    "to": "2026-06-03"
+  },
+  "totals": {
+    "projects": 8,
+    "sessions": 360,
+    "userMessages": 2771,
+    "assistantMessages": 8313,
+    "activeDays": 141,
+    "tokens": {
+      "input": 2096071,
+      "output": 7959620,
+      "cacheRead": 375187151,
+      "cacheWrite": 33202970,
+      "total": 418445812
+    }
+  },
+  "tools": [
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "provides": {
+        "messages": true,
+        "tokens": true
+      },
+      "sessions": 212,
+      "userMessages": 1894,
+      "assistantMessages": 5682,
+      "tokens": {
+        "input": 1434153,
+        "output": 5430331,
+        "cacheRead": 256652811,
+        "cacheWrite": 22775172,
+        "total": 286292467
+      },
+      "firstActivity": "2026-01-05",
+      "lastActivity": "2026-06-03"
+    },
+    {
+      "id": "cline",
+      "name": "Cline (CLI)",
+      "provides": {
+        "messages": true,
+        "tokens": true
+      },
+      "sessions": 113,
+      "userMessages": 877,
+      "assistantMessages": 2631,
+      "tokens": {
+        "input": 661918,
+        "output": 2529289,
+        "cacheRead": 118534340,
+        "cacheWrite": 10427798,
+        "total": 132153345
+      },
+      "firstActivity": "2026-01-05",
+      "lastActivity": "2026-06-03"
+    },
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT (catálogo do app desktop)",
+      "provides": {
+        "messages": false,
+        "tokens": false
+      },
+      "sessions": 35,
+      "userMessages": 0,
+      "assistantMessages": 0,
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+      },
+      "firstActivity": "2026-01-10",
+      "lastActivity": "2026-06-03"
+    }
+  ],
+  "projects": [
+    {
+      "name": "meu-site",
+      "public": true,
+      "sessions": 81,
+      "userMessages": 1096,
+      "assistantMessages": 3288,
+      "tokens": {
+        "input": 837344,
+        "output": 3125289,
+        "cacheRead": 149566837,
+        "cacheWrite": 13224043,
+        "total": 166753513
+      },
+      "firstActivity": "2026-01-05",
+      "lastActivity": "2026-06-03",
+      "tools": [
+        {
+          "id": "claude-code",
+          "sessions": 57,
+          "userMessages": 813,
+          "assistantMessages": 2439,
+          "tokens": {
+            "input": 619583,
+            "output": 2295983,
+            "cacheRead": 110980467,
+            "cacheWrite": 9831213,
+            "total": 123727246
+          }
+        },
+        {
+          "id": "cline",
+          "sessions": 24,
+          "userMessages": 283,
+          "assistantMessages": 849,
+          "tokens": {
+            "input": 217761,
+            "output": 829306,
+            "cacheRead": 38586370,
+            "cacheWrite": 3392830,
+            "total": 43026267
+          }
+        }
+      ]
+    },
+    {
+      "name": "app-de-tarefas",
+      "public": true,
+      "sessions": 63,
+      "userMessages": 614,
+      "assistantMessages": 1842,
+      "tokens": {
+        "input": 461275,
+        "output": 1770747,
+        "cacheRead": 82496232,
+        "cacheWrite": 7405556,
+        "total": 92133810
+      },
+      "firstActivity": "2026-01-05",
+      "lastActivity": "2026-06-03",
+      "tools": [
+        {
+          "id": "claude-code",
+          "sessions": 32,
+          "userMessages": 305,
+          "assistantMessages": 915,
+          "tokens": {
+            "input": 231222,
+            "output": 898621,
+            "cacheRead": 40717700,
+            "cacheWrite": 3739661,
+            "total": 45587204
+          }
+        },
+        {
+          "id": "cline",
+          "sessions": 31,
+          "userMessages": 309,
+          "assistantMessages": 927,
+          "tokens": {
+            "input": 230053,
+            "output": 872126,
+            "cacheRead": 41778532,
+            "cacheWrite": 3665895,
+            "total": 46546606
+          }
+        }
+      ]
+    },
+    {
+      "name": "api-de-pagamentos",
+      "public": true,
+      "sessions": 49,
+      "userMessages": 362,
+      "assistantMessages": 1086,
+      "tokens": {
+        "input": 270870,
+        "output": 1043624,
+        "cacheRead": 49211072,
+        "cacheWrite": 4214903,
+        "total": 54740469
+      },
+      "firstActivity": "2026-01-05",
+      "lastActivity": "2026-06-03",
+      "tools": [
+        {
+          "id": "claude-code",
+          "sessions": 49,
+          "userMessages": 362,
+          "assistantMessages": 1086,
+          "tokens": {
+            "input": 270870,
+            "output": 1043624,
+            "cacheRead": 49211072,
+            "cacheWrite": 4214903,
+            "total": 54740469
+          }
+        }
+      ]
+    },
+    {
+      "name": "projeto-privado-1",
+      "public": false,
+      "sessions": 42,
+      "userMessages": 272,
+      "assistantMessages": 816,
+      "tokens": {
+        "input": 207441,
+        "output": 772540,
+        "cacheRead": 36251569,
+        "cacheWrite": 3259910,
+        "total": 40491460
+      },
+      "firstActivity": "2026-01-06",
+      "lastActivity": "2026-05-30",
+      "tools": [
+        {
+          "id": "claude-code",
+          "sessions": 42,
+          "userMessages": 272,
+          "assistantMessages": 816,
+          "tokens": {
+            "input": 207441,
+            "output": 772540,
+            "cacheRead": 36251569,
+            "cacheWrite": 3259910,
+            "total": 40491460
+          }
+        }
+      ]
+    },
+    {
+      "name": "bot-do-discord",
+      "public": true,
+      "sessions": 31,
+      "userMessages": 150,
+      "assistantMessages": 450,
+      "tokens": {
+        "input": 114744,
+        "output": 433765,
+        "cacheRead": 20298501,
+        "cacheWrite": 1759104,
+        "total": 22606114
+      },
+      "firstActivity": "2026-01-05",
+      "lastActivity": "2026-05-30",
+      "tools": [
+        {
+          "id": "cline",
+          "sessions": 31,
+          "userMessages": 150,
+          "assistantMessages": 450,
+          "tokens": {
+            "input": 114744,
+            "output": 433765,
+            "cacheRead": 20298501,
+            "cacheWrite": 1759104,
+            "total": 22606114
+          }
+        }
+      ]
+    },
+    {
+      "name": "estudos",
+      "public": true,
+      "sessions": 32,
+      "userMessages": 142,
+      "assistantMessages": 426,
+      "tokens": {
+        "input": 105037,
+        "output": 419563,
+        "cacheRead": 19492003,
+        "cacheWrite": 1729485,
+        "total": 21746088
+      },
+      "firstActivity": "2026-01-06",
+      "lastActivity": "2026-06-02",
+      "tools": [
+        {
+          "id": "claude-code",
+          "sessions": 32,
+          "userMessages": 142,
+          "assistantMessages": 426,
+          "tokens": {
+            "input": 105037,
+            "output": 419563,
+            "cacheRead": 19492003,
+            "cacheWrite": 1729485,
+            "total": 21746088
+          }
+        }
+      ]
+    },
+    {
+      "name": "projeto-privado-2",
+      "public": false,
+      "sessions": 27,
+      "userMessages": 135,
+      "assistantMessages": 405,
+      "tokens": {
+        "input": 99360,
+        "output": 394092,
+        "cacheRead": 17870937,
+        "cacheWrite": 1609969,
+        "total": 19974358
+      },
+      "firstActivity": "2026-01-06",
+      "lastActivity": "2026-06-02",
+      "tools": [
+        {
+          "id": "cline",
+          "sessions": 27,
+          "userMessages": 135,
+          "assistantMessages": 405,
+          "tokens": {
+            "input": 99360,
+            "output": 394092,
+            "cacheRead": 17870937,
+            "cacheWrite": 1609969,
+            "total": 19974358
+          }
+        }
+      ]
+    },
+    {
+      "name": "sem-projeto",
+      "public": true,
+      "sessions": 35,
+      "userMessages": 0,
+      "assistantMessages": 0,
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+      },
+      "firstActivity": "2026-01-10",
+      "lastActivity": "2026-06-03",
+      "tools": [
+        {
+          "id": "chatgpt",
+          "sessions": 35,
+          "userMessages": 0,
+          "assistantMessages": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        }
+      ]
+    }
+  ],
+  "timeline": {
+    "granularity": "day",
+    "timezone": "UTC",
+    "points": [
+      {
+        "date": "2026-01-05",
+        "sessions": 4,
+        "userMessages": 45,
+        "assistantMessages": 135,
+        "tokens": 6547546,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 21,
+            "tokens": 2694793
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 24,
+            "tokens": 3852753
+          }
+        }
+      },
+      {
+        "date": "2026-01-06",
+        "sessions": 5,
+        "userMessages": 25,
+        "assistantMessages": 75,
+        "tokens": 3671475,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 19,
+            "tokens": 2756073
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 6,
+            "tokens": 915402
+          }
+        }
+      },
+      {
+        "date": "2026-01-07",
+        "sessions": 4,
+        "userMessages": 28,
+        "assistantMessages": 84,
+        "tokens": 4489825,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 5,
+            "tokens": 755653
+          },
+          "cline": {
+            "sessions": 3,
+            "userMessages": 23,
+            "tokens": 3734172
+          }
+        }
+      },
+      {
+        "date": "2026-01-08",
+        "sessions": 1,
+        "userMessages": 6,
+        "assistantMessages": 18,
+        "tokens": 917161,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 6,
+            "tokens": 917161
+          }
+        }
+      },
+      {
+        "date": "2026-01-09",
+        "sessions": 4,
+        "userMessages": 23,
+        "assistantMessages": 69,
+        "tokens": 3698588,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 294154
+          },
+          "cline": {
+            "sessions": 3,
+            "userMessages": 21,
+            "tokens": 3404434
+          }
+        }
+      },
+      {
+        "date": "2026-01-10",
+        "sessions": 2,
+        "userMessages": 7,
+        "assistantMessages": 21,
+        "tokens": 1051482,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 7,
+            "tokens": 1051482
+          }
+        }
+      },
+      {
+        "date": "2026-01-11",
+        "sessions": 2,
+        "userMessages": 13,
+        "assistantMessages": 39,
+        "tokens": 1963226,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 11,
+            "tokens": 1590793
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 372433
+          }
+        }
+      },
+      {
+        "date": "2026-01-12",
+        "sessions": 3,
+        "userMessages": 44,
+        "assistantMessages": 132,
+        "tokens": 6486848,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 44,
+            "tokens": 6486848
+          }
+        }
+      },
+      {
+        "date": "2026-01-13",
+        "sessions": 5,
+        "userMessages": 62,
+        "assistantMessages": 186,
+        "tokens": 9022697,
+        "byTool": {
+          "claude-code": {
+            "sessions": 4,
+            "userMessages": 44,
+            "tokens": 6552816
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 18,
+            "tokens": 2469881
+          }
+        }
+      },
+      {
+        "date": "2026-01-14",
+        "sessions": 3,
+        "userMessages": 17,
+        "assistantMessages": 51,
+        "tokens": 2743230,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 17,
+            "tokens": 2743230
+          }
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "sessions": 4,
+        "userMessages": 51,
+        "assistantMessages": 153,
+        "tokens": 7487689,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 34,
+            "tokens": 4761420
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 17,
+            "tokens": 2726269
+          }
+        }
+      },
+      {
+        "date": "2026-01-16",
+        "sessions": 1,
+        "userMessages": 3,
+        "assistantMessages": 9,
+        "tokens": 457094,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 457094
+          }
+        }
+      },
+      {
+        "date": "2026-01-17",
+        "sessions": 1,
+        "userMessages": 11,
+        "assistantMessages": 33,
+        "tokens": 1661260,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 11,
+            "tokens": 1661260
+          }
+        }
+      },
+      {
+        "date": "2026-01-18",
+        "sessions": 2,
+        "userMessages": 13,
+        "assistantMessages": 39,
+        "tokens": 1683972,
+        "byTool": {
+          "cline": {
+            "sessions": 2,
+            "userMessages": 13,
+            "tokens": 1683972
+          }
+        }
+      },
+      {
+        "date": "2026-01-19",
+        "sessions": 2,
+        "userMessages": 25,
+        "assistantMessages": 75,
+        "tokens": 3504944,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 15,
+            "tokens": 2063183
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 10,
+            "tokens": 1441761
+          }
+        }
+      },
+      {
+        "date": "2026-01-20",
+        "sessions": 3,
+        "userMessages": 22,
+        "assistantMessages": 66,
+        "tokens": 3251588,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 16,
+            "tokens": 2408567
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 6,
+            "tokens": 843021
+          }
+        }
+      },
+      {
+        "date": "2026-01-21",
+        "sessions": 3,
+        "userMessages": 37,
+        "assistantMessages": 111,
+        "tokens": 5664382,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 20,
+            "tokens": 3022960
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 17,
+            "tokens": 2641422
+          }
+        }
+      },
+      {
+        "date": "2026-01-22",
+        "sessions": 1,
+        "userMessages": 9,
+        "assistantMessages": 27,
+        "tokens": 1434571,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 9,
+            "tokens": 1434571
+          }
+        }
+      },
+      {
+        "date": "2026-01-23",
+        "sessions": 2,
+        "userMessages": 6,
+        "assistantMessages": 18,
+        "tokens": 732636,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 353281
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 379355
+          }
+        }
+      },
+      {
+        "date": "2026-01-24",
+        "sessions": 2,
+        "userMessages": 23,
+        "assistantMessages": 69,
+        "tokens": 3076810,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 23,
+            "tokens": 3076810
+          }
+        }
+      },
+      {
+        "date": "2026-01-26",
+        "sessions": 2,
+        "userMessages": 3,
+        "assistantMessages": 9,
+        "tokens": 319225,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 319225
+          }
+        }
+      },
+      {
+        "date": "2026-01-27",
+        "sessions": 4,
+        "userMessages": 43,
+        "assistantMessages": 129,
+        "tokens": 6524895,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 43,
+            "tokens": 6524895
+          }
+        }
+      },
+      {
+        "date": "2026-01-28",
+        "sessions": 2,
+        "userMessages": 10,
+        "assistantMessages": 30,
+        "tokens": 1649766,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 8,
+            "tokens": 1297586
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 352180
+          }
+        }
+      },
+      {
+        "date": "2026-01-29",
+        "sessions": 2,
+        "userMessages": 29,
+        "assistantMessages": 87,
+        "tokens": 3914045,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 29,
+            "tokens": 3914045
+          }
+        }
+      },
+      {
+        "date": "2026-01-30",
+        "sessions": 4,
+        "userMessages": 18,
+        "assistantMessages": 54,
+        "tokens": 2628261,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 15,
+            "tokens": 2130023
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 498238
+          }
+        }
+      },
+      {
+        "date": "2026-01-31",
+        "sessions": 2,
+        "userMessages": 6,
+        "assistantMessages": 18,
+        "tokens": 907040,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 6,
+            "tokens": 907040
+          }
+        }
+      },
+      {
+        "date": "2026-02-02",
+        "sessions": 5,
+        "userMessages": 33,
+        "assistantMessages": 99,
+        "tokens": 5109829,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 19,
+            "tokens": 3076277
+          },
+          "cline": {
+            "sessions": 3,
+            "userMessages": 14,
+            "tokens": 2033552
+          }
+        }
+      },
+      {
+        "date": "2026-02-03",
+        "sessions": 2,
+        "userMessages": 2,
+        "assistantMessages": 6,
+        "tokens": 274187,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 274187
+          }
+        }
+      },
+      {
+        "date": "2026-02-04",
+        "sessions": 4,
+        "userMessages": 38,
+        "assistantMessages": 114,
+        "tokens": 6088966,
+        "byTool": {
+          "claude-code": {
+            "sessions": 4,
+            "userMessages": 38,
+            "tokens": 6088966
+          }
+        }
+      },
+      {
+        "date": "2026-02-05",
+        "sessions": 3,
+        "userMessages": 33,
+        "assistantMessages": 99,
+        "tokens": 5213442,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 33,
+            "tokens": 5213442
+          }
+        }
+      },
+      {
+        "date": "2026-02-06",
+        "sessions": 1,
+        "userMessages": 7,
+        "assistantMessages": 21,
+        "tokens": 977631,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 7,
+            "tokens": 977631
+          }
+        }
+      },
+      {
+        "date": "2026-02-07",
+        "sessions": 1,
+        "userMessages": 9,
+        "assistantMessages": 27,
+        "tokens": 1257948,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 9,
+            "tokens": 1257948
+          }
+        }
+      },
+      {
+        "date": "2026-02-08",
+        "sessions": 1,
+        "userMessages": 0,
+        "assistantMessages": 0,
+        "tokens": 0,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          }
+        }
+      },
+      {
+        "date": "2026-02-09",
+        "sessions": 1,
+        "userMessages": 9,
+        "assistantMessages": 27,
+        "tokens": 1440837,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 9,
+            "tokens": 1440837
+          }
+        }
+      },
+      {
+        "date": "2026-02-10",
+        "sessions": 5,
+        "userMessages": 37,
+        "assistantMessages": 111,
+        "tokens": 5627460,
+        "byTool": {
+          "claude-code": {
+            "sessions": 4,
+            "userMessages": 29,
+            "tokens": 4386681
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 8,
+            "tokens": 1240779
+          }
+        }
+      },
+      {
+        "date": "2026-02-11",
+        "sessions": 1,
+        "userMessages": 17,
+        "assistantMessages": 51,
+        "tokens": 2309884,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 17,
+            "tokens": 2309884
+          }
+        }
+      },
+      {
+        "date": "2026-02-12",
+        "sessions": 2,
+        "userMessages": 20,
+        "assistantMessages": 60,
+        "tokens": 3192960,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 18,
+            "tokens": 2809974
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 382986
+          }
+        }
+      },
+      {
+        "date": "2026-02-13",
+        "sessions": 5,
+        "userMessages": 38,
+        "assistantMessages": 114,
+        "tokens": 5519906,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 26,
+            "tokens": 3741143
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 12,
+            "tokens": 1778763
+          }
+        }
+      },
+      {
+        "date": "2026-02-14",
+        "sessions": 4,
+        "userMessages": 39,
+        "assistantMessages": 117,
+        "tokens": 5798810,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 34,
+            "tokens": 4946470
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 5,
+            "tokens": 852340
+          }
+        }
+      },
+      {
+        "date": "2026-02-15",
+        "sessions": 3,
+        "userMessages": 26,
+        "assistantMessages": 78,
+        "tokens": 3378238,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 12,
+            "tokens": 1572576
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 14,
+            "tokens": 1805662
+          }
+        }
+      },
+      {
+        "date": "2026-02-16",
+        "sessions": 6,
+        "userMessages": 35,
+        "assistantMessages": 105,
+        "tokens": 5623485,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 4,
+            "userMessages": 32,
+            "tokens": 5187396
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 436089
+          }
+        }
+      },
+      {
+        "date": "2026-02-17",
+        "sessions": 5,
+        "userMessages": 32,
+        "assistantMessages": 96,
+        "tokens": 4860571,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 4,
+            "userMessages": 32,
+            "tokens": 4860571
+          }
+        }
+      },
+      {
+        "date": "2026-02-18",
+        "sessions": 3,
+        "userMessages": 22,
+        "assistantMessages": 66,
+        "tokens": 2793206,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 22,
+            "tokens": 2793206
+          }
+        }
+      },
+      {
+        "date": "2026-02-19",
+        "sessions": 2,
+        "userMessages": 18,
+        "assistantMessages": 54,
+        "tokens": 2636131,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 18,
+            "tokens": 2636131
+          }
+        }
+      },
+      {
+        "date": "2026-02-20",
+        "sessions": 2,
+        "userMessages": 8,
+        "assistantMessages": 24,
+        "tokens": 936365,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 8,
+            "tokens": 936365
+          }
+        }
+      },
+      {
+        "date": "2026-02-22",
+        "sessions": 1,
+        "userMessages": 4,
+        "assistantMessages": 12,
+        "tokens": 596022,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 4,
+            "tokens": 596022
+          }
+        }
+      },
+      {
+        "date": "2026-02-23",
+        "sessions": 5,
+        "userMessages": 33,
+        "assistantMessages": 99,
+        "tokens": 4699604,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 332186
+          },
+          "cline": {
+            "sessions": 3,
+            "userMessages": 30,
+            "tokens": 4367418
+          }
+        }
+      },
+      {
+        "date": "2026-02-25",
+        "sessions": 2,
+        "userMessages": 11,
+        "assistantMessages": 33,
+        "tokens": 1791472,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 11,
+            "tokens": 1791472
+          }
+        }
+      },
+      {
+        "date": "2026-02-26",
+        "sessions": 4,
+        "userMessages": 33,
+        "assistantMessages": 99,
+        "tokens": 5067195,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 19,
+            "tokens": 3222345
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 14,
+            "tokens": 1844850
+          }
+        }
+      },
+      {
+        "date": "2026-02-27",
+        "sessions": 2,
+        "userMessages": 3,
+        "assistantMessages": 9,
+        "tokens": 600888,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 600888
+          }
+        }
+      },
+      {
+        "date": "2026-02-28",
+        "sessions": 1,
+        "userMessages": 2,
+        "assistantMessages": 6,
+        "tokens": 336278,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 336278
+          }
+        }
+      },
+      {
+        "date": "2026-03-01",
+        "sessions": 1,
+        "userMessages": 0,
+        "assistantMessages": 0,
+        "tokens": 0,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          }
+        }
+      },
+      {
+        "date": "2026-03-02",
+        "sessions": 3,
+        "userMessages": 26,
+        "assistantMessages": 78,
+        "tokens": 3978206,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 9,
+            "tokens": 1523994
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 17,
+            "tokens": 2454212
+          }
+        }
+      },
+      {
+        "date": "2026-03-03",
+        "sessions": 2,
+        "userMessages": 10,
+        "assistantMessages": 30,
+        "tokens": 1496572,
+        "byTool": {
+          "cline": {
+            "sessions": 2,
+            "userMessages": 10,
+            "tokens": 1496572
+          }
+        }
+      },
+      {
+        "date": "2026-03-04",
+        "sessions": 4,
+        "userMessages": 22,
+        "assistantMessages": 66,
+        "tokens": 3564230,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 22,
+            "tokens": 3564230
+          }
+        }
+      },
+      {
+        "date": "2026-03-05",
+        "sessions": 4,
+        "userMessages": 25,
+        "assistantMessages": 75,
+        "tokens": 3613094,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 5,
+            "tokens": 695170
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 20,
+            "tokens": 2917924
+          }
+        }
+      },
+      {
+        "date": "2026-03-06",
+        "sessions": 2,
+        "userMessages": 19,
+        "assistantMessages": 57,
+        "tokens": 3044752,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 19,
+            "tokens": 3044752
+          }
+        }
+      },
+      {
+        "date": "2026-03-07",
+        "sessions": 1,
+        "userMessages": 15,
+        "assistantMessages": 45,
+        "tokens": 2317767,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 15,
+            "tokens": 2317767
+          }
+        }
+      },
+      {
+        "date": "2026-03-08",
+        "sessions": 1,
+        "userMessages": 18,
+        "assistantMessages": 54,
+        "tokens": 2766573,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 18,
+            "tokens": 2766573
+          }
+        }
+      },
+      {
+        "date": "2026-03-09",
+        "sessions": 3,
+        "userMessages": 28,
+        "assistantMessages": 84,
+        "tokens": 4266082,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 28,
+            "tokens": 4266082
+          }
+        }
+      },
+      {
+        "date": "2026-03-10",
+        "sessions": 3,
+        "userMessages": 16,
+        "assistantMessages": 48,
+        "tokens": 2443815,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 4,
+            "tokens": 570431
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 12,
+            "tokens": 1873384
+          }
+        }
+      },
+      {
+        "date": "2026-03-11",
+        "sessions": 2,
+        "userMessages": 20,
+        "assistantMessages": 60,
+        "tokens": 2779109,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 8,
+            "tokens": 1167992
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 12,
+            "tokens": 1611117
+          }
+        }
+      },
+      {
+        "date": "2026-03-12",
+        "sessions": 1,
+        "userMessages": 3,
+        "assistantMessages": 9,
+        "tokens": 434567,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 434567
+          }
+        }
+      },
+      {
+        "date": "2026-03-13",
+        "sessions": 4,
+        "userMessages": 26,
+        "assistantMessages": 78,
+        "tokens": 3736277,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 17,
+            "tokens": 2342081
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 9,
+            "tokens": 1394196
+          }
+        }
+      },
+      {
+        "date": "2026-03-14",
+        "sessions": 1,
+        "userMessages": 3,
+        "assistantMessages": 9,
+        "tokens": 347900,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 347900
+          }
+        }
+      },
+      {
+        "date": "2026-03-15",
+        "sessions": 1,
+        "userMessages": 8,
+        "assistantMessages": 24,
+        "tokens": 1117563,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 8,
+            "tokens": 1117563
+          }
+        }
+      },
+      {
+        "date": "2026-03-16",
+        "sessions": 2,
+        "userMessages": 13,
+        "assistantMessages": 39,
+        "tokens": 1876582,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 13,
+            "tokens": 1876582
+          }
+        }
+      },
+      {
+        "date": "2026-03-18",
+        "sessions": 4,
+        "userMessages": 28,
+        "assistantMessages": 84,
+        "tokens": 4579626,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 15,
+            "tokens": 2433353
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 13,
+            "tokens": 2146273
+          }
+        }
+      },
+      {
+        "date": "2026-03-19",
+        "sessions": 1,
+        "userMessages": 14,
+        "assistantMessages": 42,
+        "tokens": 2117150,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 14,
+            "tokens": 2117150
+          }
+        }
+      },
+      {
+        "date": "2026-03-20",
+        "sessions": 3,
+        "userMessages": 38,
+        "assistantMessages": 114,
+        "tokens": 5588657,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 38,
+            "tokens": 5588657
+          }
+        }
+      },
+      {
+        "date": "2026-03-21",
+        "sessions": 1,
+        "userMessages": 5,
+        "assistantMessages": 15,
+        "tokens": 794651,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 5,
+            "tokens": 794651
+          }
+        }
+      },
+      {
+        "date": "2026-03-22",
+        "sessions": 2,
+        "userMessages": 18,
+        "assistantMessages": 54,
+        "tokens": 2943348,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 12,
+            "tokens": 2046668
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 6,
+            "tokens": 896680
+          }
+        }
+      },
+      {
+        "date": "2026-03-23",
+        "sessions": 3,
+        "userMessages": 18,
+        "assistantMessages": 54,
+        "tokens": 2828792,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 18,
+            "tokens": 2828792
+          }
+        }
+      },
+      {
+        "date": "2026-03-24",
+        "sessions": 1,
+        "userMessages": 14,
+        "assistantMessages": 42,
+        "tokens": 2155955,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 14,
+            "tokens": 2155955
+          }
+        }
+      },
+      {
+        "date": "2026-03-25",
+        "sessions": 1,
+        "userMessages": 12,
+        "assistantMessages": 36,
+        "tokens": 1796556,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 12,
+            "tokens": 1796556
+          }
+        }
+      },
+      {
+        "date": "2026-03-26",
+        "sessions": 2,
+        "userMessages": 4,
+        "assistantMessages": 12,
+        "tokens": 467040,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 4,
+            "tokens": 467040
+          }
+        }
+      },
+      {
+        "date": "2026-03-27",
+        "sessions": 4,
+        "userMessages": 22,
+        "assistantMessages": 66,
+        "tokens": 3276818,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 13,
+            "tokens": 2019660
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 9,
+            "tokens": 1257158
+          }
+        }
+      },
+      {
+        "date": "2026-03-28",
+        "sessions": 3,
+        "userMessages": 29,
+        "assistantMessages": 87,
+        "tokens": 4384244,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 27,
+            "tokens": 4103564
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 280680
+          }
+        }
+      },
+      {
+        "date": "2026-03-30",
+        "sessions": 5,
+        "userMessages": 38,
+        "assistantMessages": 114,
+        "tokens": 5699102,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 12,
+            "tokens": 1751135
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 26,
+            "tokens": 3947967
+          }
+        }
+      },
+      {
+        "date": "2026-03-31",
+        "sessions": 4,
+        "userMessages": 23,
+        "assistantMessages": 69,
+        "tokens": 3668092,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 21,
+            "tokens": 3339992
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 328100
+          }
+        }
+      },
+      {
+        "date": "2026-04-01",
+        "sessions": 1,
+        "userMessages": 11,
+        "assistantMessages": 33,
+        "tokens": 1709811,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 11,
+            "tokens": 1709811
+          }
+        }
+      },
+      {
+        "date": "2026-04-02",
+        "sessions": 2,
+        "userMessages": 5,
+        "assistantMessages": 15,
+        "tokens": 697747,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 5,
+            "tokens": 697747
+          }
+        }
+      },
+      {
+        "date": "2026-04-03",
+        "sessions": 3,
+        "userMessages": 26,
+        "assistantMessages": 78,
+        "tokens": 3991892,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 20,
+            "tokens": 3050676
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 6,
+            "tokens": 941216
+          }
+        }
+      },
+      {
+        "date": "2026-04-04",
+        "sessions": 3,
+        "userMessages": 31,
+        "assistantMessages": 93,
+        "tokens": 4919405,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 31,
+            "tokens": 4919405
+          }
+        }
+      },
+      {
+        "date": "2026-04-05",
+        "sessions": 1,
+        "userMessages": 14,
+        "assistantMessages": 42,
+        "tokens": 2286339,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 14,
+            "tokens": 2286339
+          }
+        }
+      },
+      {
+        "date": "2026-04-06",
+        "sessions": 1,
+        "userMessages": 5,
+        "assistantMessages": 15,
+        "tokens": 812214,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 5,
+            "tokens": 812214
+          }
+        }
+      },
+      {
+        "date": "2026-04-07",
+        "sessions": 1,
+        "userMessages": 8,
+        "assistantMessages": 24,
+        "tokens": 1071535,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 8,
+            "tokens": 1071535
+          }
+        }
+      },
+      {
+        "date": "2026-04-08",
+        "sessions": 2,
+        "userMessages": 4,
+        "assistantMessages": 12,
+        "tokens": 769348,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 4,
+            "tokens": 769348
+          }
+        }
+      },
+      {
+        "date": "2026-04-09",
+        "sessions": 2,
+        "userMessages": 31,
+        "assistantMessages": 93,
+        "tokens": 4457787,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 31,
+            "tokens": 4457787
+          }
+        }
+      },
+      {
+        "date": "2026-04-10",
+        "sessions": 1,
+        "userMessages": 23,
+        "assistantMessages": 69,
+        "tokens": 3408619,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 23,
+            "tokens": 3408619
+          }
+        }
+      },
+      {
+        "date": "2026-04-11",
+        "sessions": 2,
+        "userMessages": 21,
+        "assistantMessages": 63,
+        "tokens": 2969031,
+        "byTool": {
+          "cline": {
+            "sessions": 2,
+            "userMessages": 21,
+            "tokens": 2969031
+          }
+        }
+      },
+      {
+        "date": "2026-04-12",
+        "sessions": 2,
+        "userMessages": 30,
+        "assistantMessages": 90,
+        "tokens": 4685012,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 30,
+            "tokens": 4685012
+          }
+        }
+      },
+      {
+        "date": "2026-04-13",
+        "sessions": 3,
+        "userMessages": 24,
+        "assistantMessages": 72,
+        "tokens": 3592248,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 24,
+            "tokens": 3592248
+          }
+        }
+      },
+      {
+        "date": "2026-04-14",
+        "sessions": 2,
+        "userMessages": 2,
+        "assistantMessages": 6,
+        "tokens": 445752,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 445752
+          }
+        }
+      },
+      {
+        "date": "2026-04-15",
+        "sessions": 3,
+        "userMessages": 32,
+        "assistantMessages": 96,
+        "tokens": 5702678,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 32,
+            "tokens": 5702678
+          }
+        }
+      },
+      {
+        "date": "2026-04-16",
+        "sessions": 4,
+        "userMessages": 34,
+        "assistantMessages": 102,
+        "tokens": 5336350,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 11,
+            "tokens": 1573237
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 23,
+            "tokens": 3763113
+          }
+        }
+      },
+      {
+        "date": "2026-04-17",
+        "sessions": 4,
+        "userMessages": 28,
+        "assistantMessages": 84,
+        "tokens": 3953198,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 18,
+            "tokens": 2633459
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 10,
+            "tokens": 1319739
+          }
+        }
+      },
+      {
+        "date": "2026-04-19",
+        "sessions": 2,
+        "userMessages": 22,
+        "assistantMessages": 66,
+        "tokens": 2765232,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 15,
+            "tokens": 1806836
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 7,
+            "tokens": 958396
+          }
+        }
+      },
+      {
+        "date": "2026-04-20",
+        "sessions": 6,
+        "userMessages": 37,
+        "assistantMessages": 111,
+        "tokens": 5621301,
+        "byTool": {
+          "claude-code": {
+            "sessions": 4,
+            "userMessages": 25,
+            "tokens": 3688042
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 12,
+            "tokens": 1933259
+          }
+        }
+      },
+      {
+        "date": "2026-04-21",
+        "sessions": 4,
+        "userMessages": 16,
+        "assistantMessages": 48,
+        "tokens": 2335177,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 16,
+            "tokens": 2335177
+          }
+        }
+      },
+      {
+        "date": "2026-04-22",
+        "sessions": 3,
+        "userMessages": 25,
+        "assistantMessages": 75,
+        "tokens": 3538738,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 19,
+            "tokens": 2665807
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 6,
+            "tokens": 872931
+          }
+        }
+      },
+      {
+        "date": "2026-04-23",
+        "sessions": 4,
+        "userMessages": 11,
+        "assistantMessages": 33,
+        "tokens": 1717008,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 4,
+            "tokens": 890645
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 7,
+            "tokens": 826363
+          }
+        }
+      },
+      {
+        "date": "2026-04-24",
+        "sessions": 2,
+        "userMessages": 20,
+        "assistantMessages": 60,
+        "tokens": 3390153,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 7,
+            "tokens": 1127152
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 13,
+            "tokens": 2263001
+          }
+        }
+      },
+      {
+        "date": "2026-04-27",
+        "sessions": 1,
+        "userMessages": 24,
+        "assistantMessages": 72,
+        "tokens": 3531388,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 24,
+            "tokens": 3531388
+          }
+        }
+      },
+      {
+        "date": "2026-04-28",
+        "sessions": 2,
+        "userMessages": 25,
+        "assistantMessages": 75,
+        "tokens": 3848056,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 11,
+            "tokens": 1731282
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 14,
+            "tokens": 2116774
+          }
+        }
+      },
+      {
+        "date": "2026-04-29",
+        "sessions": 1,
+        "userMessages": 10,
+        "assistantMessages": 30,
+        "tokens": 1396237,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 10,
+            "tokens": 1396237
+          }
+        }
+      },
+      {
+        "date": "2026-04-30",
+        "sessions": 1,
+        "userMessages": 15,
+        "assistantMessages": 45,
+        "tokens": 2558866,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 15,
+            "tokens": 2558866
+          }
+        }
+      },
+      {
+        "date": "2026-05-01",
+        "sessions": 1,
+        "userMessages": 0,
+        "assistantMessages": 0,
+        "tokens": 0,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          }
+        }
+      },
+      {
+        "date": "2026-05-02",
+        "sessions": 2,
+        "userMessages": 16,
+        "assistantMessages": 48,
+        "tokens": 2412543,
+        "byTool": {
+          "cline": {
+            "sessions": 2,
+            "userMessages": 16,
+            "tokens": 2412543
+          }
+        }
+      },
+      {
+        "date": "2026-05-03",
+        "sessions": 4,
+        "userMessages": 44,
+        "assistantMessages": 132,
+        "tokens": 6549261,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 29,
+            "tokens": 4449240
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 15,
+            "tokens": 2100021
+          }
+        }
+      },
+      {
+        "date": "2026-05-04",
+        "sessions": 2,
+        "userMessages": 21,
+        "assistantMessages": 63,
+        "tokens": 3560743,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 21,
+            "tokens": 3560743
+          }
+        }
+      },
+      {
+        "date": "2026-05-05",
+        "sessions": 3,
+        "userMessages": 23,
+        "assistantMessages": 69,
+        "tokens": 3226014,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 13,
+            "tokens": 1812045
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 10,
+            "tokens": 1413969
+          }
+        }
+      },
+      {
+        "date": "2026-05-06",
+        "sessions": 3,
+        "userMessages": 11,
+        "assistantMessages": 33,
+        "tokens": 1789018,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 5,
+            "tokens": 711864
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 6,
+            "tokens": 1077154
+          }
+        }
+      },
+      {
+        "date": "2026-05-07",
+        "sessions": 3,
+        "userMessages": 14,
+        "assistantMessages": 42,
+        "tokens": 2064588,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 7,
+            "tokens": 1137233
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 7,
+            "tokens": 927355
+          }
+        }
+      },
+      {
+        "date": "2026-05-08",
+        "sessions": 2,
+        "userMessages": 24,
+        "assistantMessages": 72,
+        "tokens": 3329844,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 24,
+            "tokens": 3329844
+          }
+        }
+      },
+      {
+        "date": "2026-05-09",
+        "sessions": 2,
+        "userMessages": 5,
+        "assistantMessages": 15,
+        "tokens": 679257,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 5,
+            "tokens": 679257
+          }
+        }
+      },
+      {
+        "date": "2026-05-10",
+        "sessions": 2,
+        "userMessages": 7,
+        "assistantMessages": 21,
+        "tokens": 1209158,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 7,
+            "tokens": 1209158
+          }
+        }
+      },
+      {
+        "date": "2026-05-11",
+        "sessions": 2,
+        "userMessages": 32,
+        "assistantMessages": 96,
+        "tokens": 4797807,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 32,
+            "tokens": 4797807
+          }
+        }
+      },
+      {
+        "date": "2026-05-12",
+        "sessions": 2,
+        "userMessages": 16,
+        "assistantMessages": 48,
+        "tokens": 2606419,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 14,
+            "tokens": 2295560
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 310859
+          }
+        }
+      },
+      {
+        "date": "2026-05-13",
+        "sessions": 4,
+        "userMessages": 31,
+        "assistantMessages": 93,
+        "tokens": 4531719,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 18,
+            "tokens": 2481853
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 13,
+            "tokens": 2049866
+          }
+        }
+      },
+      {
+        "date": "2026-05-14",
+        "sessions": 5,
+        "userMessages": 26,
+        "assistantMessages": 78,
+        "tokens": 3612108,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 20,
+            "tokens": 2791461
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 6,
+            "tokens": 820647
+          }
+        }
+      },
+      {
+        "date": "2026-05-15",
+        "sessions": 3,
+        "userMessages": 14,
+        "assistantMessages": 42,
+        "tokens": 2274888,
+        "byTool": {
+          "cline": {
+            "sessions": 3,
+            "userMessages": 14,
+            "tokens": 2274888
+          }
+        }
+      },
+      {
+        "date": "2026-05-16",
+        "sessions": 1,
+        "userMessages": 11,
+        "assistantMessages": 33,
+        "tokens": 1848253,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 11,
+            "tokens": 1848253
+          }
+        }
+      },
+      {
+        "date": "2026-05-17",
+        "sessions": 2,
+        "userMessages": 19,
+        "assistantMessages": 57,
+        "tokens": 3201914,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 351504
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 17,
+            "tokens": 2850410
+          }
+        }
+      },
+      {
+        "date": "2026-05-18",
+        "sessions": 1,
+        "userMessages": 3,
+        "assistantMessages": 9,
+        "tokens": 476427,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 476427
+          }
+        }
+      },
+      {
+        "date": "2026-05-19",
+        "sessions": 3,
+        "userMessages": 19,
+        "assistantMessages": 57,
+        "tokens": 2904006,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 16,
+            "tokens": 2449453
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 3,
+            "tokens": 454553
+          }
+        }
+      },
+      {
+        "date": "2026-05-20",
+        "sessions": 3,
+        "userMessages": 19,
+        "assistantMessages": 57,
+        "tokens": 3089165,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 19,
+            "tokens": 3089165
+          }
+        }
+      },
+      {
+        "date": "2026-05-21",
+        "sessions": 4,
+        "userMessages": 10,
+        "assistantMessages": 30,
+        "tokens": 1391721,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 8,
+            "tokens": 1143821
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 247900
+          }
+        }
+      },
+      {
+        "date": "2026-05-22",
+        "sessions": 3,
+        "userMessages": 22,
+        "assistantMessages": 66,
+        "tokens": 3650732,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 20,
+            "tokens": 3417168
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 2,
+            "tokens": 233564
+          }
+        }
+      },
+      {
+        "date": "2026-05-23",
+        "sessions": 2,
+        "userMessages": 11,
+        "assistantMessages": 33,
+        "tokens": 1815415,
+        "byTool": {
+          "cline": {
+            "sessions": 2,
+            "userMessages": 11,
+            "tokens": 1815415
+          }
+        }
+      },
+      {
+        "date": "2026-05-24",
+        "sessions": 1,
+        "userMessages": 5,
+        "assistantMessages": 15,
+        "tokens": 686209,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 5,
+            "tokens": 686209
+          }
+        }
+      },
+      {
+        "date": "2026-05-25",
+        "sessions": 4,
+        "userMessages": 32,
+        "assistantMessages": 96,
+        "tokens": 5001713,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 4,
+            "tokens": 793240
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 28,
+            "tokens": 4208473
+          }
+        }
+      },
+      {
+        "date": "2026-05-26",
+        "sessions": 2,
+        "userMessages": 7,
+        "assistantMessages": 21,
+        "tokens": 954921,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 7,
+            "tokens": 954921
+          }
+        }
+      },
+      {
+        "date": "2026-05-27",
+        "sessions": 2,
+        "userMessages": 26,
+        "assistantMessages": 78,
+        "tokens": 4339432,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 26,
+            "tokens": 4339432
+          }
+        }
+      },
+      {
+        "date": "2026-05-28",
+        "sessions": 3,
+        "userMessages": 29,
+        "assistantMessages": 87,
+        "tokens": 4098740,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 23,
+            "tokens": 3275295
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 6,
+            "tokens": 823445
+          }
+        }
+      },
+      {
+        "date": "2026-05-29",
+        "sessions": 1,
+        "userMessages": 15,
+        "assistantMessages": 45,
+        "tokens": 2370483,
+        "byTool": {
+          "cline": {
+            "sessions": 1,
+            "userMessages": 15,
+            "tokens": 2370483
+          }
+        }
+      },
+      {
+        "date": "2026-05-30",
+        "sessions": 2,
+        "userMessages": 12,
+        "assistantMessages": 36,
+        "tokens": 1531318,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 4,
+            "tokens": 540900
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 8,
+            "tokens": 990418
+          }
+        }
+      },
+      {
+        "date": "2026-05-31",
+        "sessions": 3,
+        "userMessages": 30,
+        "assistantMessages": 90,
+        "tokens": 4757360,
+        "byTool": {
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 15,
+            "tokens": 2441581
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 15,
+            "tokens": 2315779
+          }
+        }
+      },
+      {
+        "date": "2026-06-01",
+        "sessions": 3,
+        "userMessages": 24,
+        "assistantMessages": 72,
+        "tokens": 4042038,
+        "byTool": {
+          "claude-code": {
+            "sessions": 3,
+            "userMessages": 24,
+            "tokens": 4042038
+          }
+        }
+      },
+      {
+        "date": "2026-06-02",
+        "sessions": 3,
+        "userMessages": 35,
+        "assistantMessages": 105,
+        "tokens": 5258583,
+        "byTool": {
+          "claude-code": {
+            "sessions": 1,
+            "userMessages": 5,
+            "tokens": 763351
+          },
+          "cline": {
+            "sessions": 2,
+            "userMessages": 30,
+            "tokens": 4495232
+          }
+        }
+      },
+      {
+        "date": "2026-06-03",
+        "sessions": 4,
+        "userMessages": 21,
+        "assistantMessages": 63,
+        "tokens": 3168202,
+        "byTool": {
+          "chatgpt": {
+            "sessions": 1,
+            "userMessages": 0,
+            "tokens": 0
+          },
+          "claude-code": {
+            "sessions": 2,
+            "userMessages": 13,
+            "tokens": 1874126
+          },
+          "cline": {
+            "sessions": 1,
+            "userMessages": 8,
+            "tokens": 1294076
+          }
+        }
+      }
+    ]
+  }
+}

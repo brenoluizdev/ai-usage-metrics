@@ -1,0 +1,63 @@
+# OPCIONAL. Copie para .github/workflows/render-svg.yml no seu repositório de dados (<usuário>/ai-metrics).
+#
+# O comando `publish` já envia o metrics.svg pronto, então este workflow NÃO é necessário.
+# Ele só serve se você quiser que o GitHub regere o SVG sempre que o metrics.json mudar
+# (por exemplo, se você envia só o JSON por outro caminho). Não foi testado em um GitHub real.
+#
+# TODO antes de usar:
+#  - troque AI_USAGE_METRICS_VERSION por uma versão que exista no npm (o pacote ainda não foi publicado);
+#  - ajuste tema, título e idioma abaixo para os mesmos valores do seu config.json local;
+#  - as ações abaixo já estão fixadas por SHA de commit (a tag de versão pode ser movida por quem controla o repositório da
+#    ação). Os SHAs foram resolvidos em 2026-11-15 com `git ls-remote` nas tags citadas nos comentários; ao atualizar uma
+#    ação, repita a consulta (`git ls-remote https://github.com/actions/<acao> refs/tags/<tag>`) e troque o SHA;
+#  - "branches" abaixo precisa ser igual à "branch" do seu config.json (o workflow não lê a configuração local).
+name: render-svg
+
+on:
+  push:
+    branches: [main] # TODO: use a mesma "branch" do seu config.json
+    paths: [metrics.json]
+
+# Permissões mínimas: só escrever no próprio repositório (para commitar o SVG).
+permissions:
+  contents: write
+
+concurrency:
+  group: render-svg
+  cancel-in-progress: true
+
+env:
+  AI_USAGE_METRICS_VERSION: "0.0.0-TODO"
+  THEME: auto
+  TITLE: AI usage
+  LANG_SVG: en
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "24"
+
+      # O render valida o JSON contra o esquema v1 estrito antes de desenhar; JSON inválido falha o job.
+      - name: Renderizar metrics.svg
+        run: >
+          npx --yes ai-usage-metrics@"$AI_USAGE_METRICS_VERSION" render
+          --input metrics.json --out metrics.svg
+          --theme "$THEME" --title "$TITLE" --lang "$LANG_SVG"
+
+      - name: Commitar só se o SVG mudou
+        run: |
+          if [ -z "$(git status --porcelain -- metrics.svg)" ]; then
+            echo "SVG sem mudanças."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add metrics.svg
+          git commit -m "chore(metrics): render SVG"
+          git push

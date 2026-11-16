@@ -1,0 +1,11 @@
+node_modules/
+# saídas e dados reais (nunca versionar)
+out/
+*.local.json
+.ai-usage-metrics/
+config.json
+state.json
+repo/
+*.log
+.env
+.env.*

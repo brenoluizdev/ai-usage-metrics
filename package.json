@@ -1,0 +1,38 @@
+{
+  "name": "ai-usage-metrics",
+  "version": "0.1.0",
+  "description": "Mede localmente o uso das suas ferramentas de IA e publica um SVG/JSON agregado e anonimizado no seu próprio repositório. Sem servidor, sem IA no meio.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brenoluizdev/ai-usage-metrics.git"
+  },
+  "bugs": {
+    "url": "https://github.com/brenoluizdev/ai-usage-metrics/issues"
+  },
+  "homepage": "https://github.com/brenoluizdev/ai-usage-metrics#readme",
+  "_TODO_antes_de_publicar": "1) licença MIT já definida (campo license e arquivo LICENSE); 2) o repositório brenoluizdev/ai-usage-metrics foi criado vazio no GitHub: decidir o histórico (reescrever os commits antigos com e-mail pessoal ou começar limpo) ANTES do primeiro push; 3) o nome 'ai-usage-metrics' estava livre no npm em 2026-11-15 (conferir de novo na hora de publicar); 4) npm pack --dry-run para conferir os arquivos; 5) 2FA na conta npm e npm publish --provenance (só em CI suportado); 6) fixar AI_USAGE_METRICS_VERSION no template do Actions; 7) remover 'private' por último. Veja SECURITY.md.",
+  "bin": {
+    "ai-usage-metrics": "bin/ai-usage-metrics.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "templates",
+    "examples",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "lint": "node scripts/lint.mjs",
+    "exemplo": "node scripts/gerar-exemplo.mjs"
+  },
+  "keywords": ["ai", "metrics", "claude-code", "cline", "github-profile", "svg"]
+}
