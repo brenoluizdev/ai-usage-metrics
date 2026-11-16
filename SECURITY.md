@@ -3,7 +3,7 @@
 ## O que a ferramenta lê e o que ela publica
 
 - **Lê** (somente leitura) os registros locais de cada fonte (ver `docs/fontes-de-dados.md`). Usa apenas datas, contagens, tokens e o nome da última pasta do projeto. Texto de conversas, código, títulos e ids de sessão são descartados em memória.
-- **Publica** exatamente dois arquivos no repositório de dados que você configurou: `metrics.json` (agregado, esquema v1) e `metrics.svg`.
+- **Publica** exatamente cinco arquivos, planos na raiz do repositório de dados que você configurou (lista fixa no código, sem subpastas): `metrics.json` (agregado, esquema v1), `metrics.svg` (o modelo escolhido em `model`) e `metrics.model-1.svg`, `metrics.model-2.svg`, `metrics.model-3.svg`.
 - **Nunca** vão para o JSON/SVG: texto de conversa, código, caminhos, nome de usuário do sistema, e-mail, ids de sessão, nomes de modelo.
 - Os bancos SQLite das outras ferramentas (Cline, app do ChatGPT) são abertos com `readOnly: true`; um teste confirma que a opção é respeitada e que o arquivo não muda depois da leitura.
 
@@ -24,6 +24,13 @@
 14. **O git nunca herda o diretório do processo.** Todo comando git roda com `cwd` explícito (o state-dir ou o clone; o `clone` roda no state-dir) e com `GIT_CEILING_DIRECTORIES` apontando para o pai do state-dir, além de `--git-dir`/`--work-tree` explícitos nos demais comandos: um state-dir dentro de um repositório seu não sobe para esse repositório (config, `insteadOf`, hooks) e ele não é tocado.
 15. **Poda de `repo.velho-*` só do que é comprovadamente nosso:** exige pasta real, `.owner.json` válido com caminho coerente (`<state-dir>/repo`) **e** a cópia interna `.git/ai-usage-metrics-owner` igual ao id do marcador. Pasta com marcador forjado não é apagada. Se o marcador não puder ser movido ao aposentar um clone, a ferramenta **avisa**: a pasta velha fica sem marcador, nunca é podada e só acumula até você removê-la.
 12. Sem rede no código da ferramenta; a única rede é o `git` do próprio usuário (clone/fetch/push) depois da confirmação. Sem token em arquivo: as credenciais são as que o seu `git` já usa.
+
+## SVGs: modelos e cores
+
+- **Lista fixa de arquivos.** O `publish` só escreve, adiciona ao git (`git add` com a lista explícita, nunca `-A`) e envia os 5 arquivos acima. As checagens existentes valem para cada um: recusa de link simbólico (no disco e no repositório remoto, modo `120000`), escrita atômica e clone sem alterações inesperadas. O dry-run lista os 5 e o diff de cada um.
+- **SVGs regerados e verificados.** Os 4 SVGs são sempre gerados de novo, no `publish`, a partir do JSON já validado (um SVG que esteja no disco nunca é enviado) e **cada um** passa pela barreira de privacidade antes de ser gravado no clone ou enviado. O `render` faz o mesmo antes de gravar. Os modelos não têm script, fonte, imagem nem link externo, e todo texto é escapado.
+- **Validação estrita de cor.** `colors`, `colorsDark` e `tools` aceitam somente `#rgb` ou `#rrggbb` (regex ancorada; nomes de cor, `rgb()`, `hsl()`, `var()`, `url()`, `;`, `}`, `<`, comentários CSS, espaços, `!important`, vazio e tipos errados são recusados). Chaves desconhecidas e ids de ferramenta fora do registro de adaptadores também. O valor é normalizado (minúsculas, 6 dígitos) e só então entra no CSS do SVG. A validação roda na carga da configuração e **de novo** no renderizador; a escala de calor é calculada no código e sempre escrita em hexadecimal. Há testes de injeção (`red;}</style><script>`, `url(javascript:...)`, `#fff"/><script`, comentários CSS).
+- **Legibilidade não é verificada**: não há ajuste automático de contraste; escolher cores legíveis é responsabilidade de quem configura.
 
 ## E-mail do commit (histórico público)
 

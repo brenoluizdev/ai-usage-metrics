@@ -26,6 +26,7 @@ Quem usa assistentes de IA todo dia raramente tem números sobre isso: quantas s
 - **Publicação com trava.** O `publish` é um dry-run por padrão e só envia com confirmação explícita.
 - **Atualização diária** por tarefa agendada (Agendador de Tarefas do Windows ou `cron`).
 - **Temas** claro, escuro ou automático, em inglês ou português (pt-BR).
+- **3 modelos de SVG** (painel completo, cartão compacto e calendário de atividade) e **cores personalizáveis**, sem servidor: veja [Modelos e cores](#modelos-e-cores).
 
 ## Fontes suportadas
 
@@ -71,7 +72,7 @@ Nos exemplos abaixo, `ai-usage-metrics` é o comando instalado. Com `npx`, escre
    ```bash
    ai-usage-metrics init --user seu-usuario --public meu-site,outro-projeto --lang pt-BR --title "Meu uso de IA"
    ```
-   O `init` grava o `config.json` e imprime o trecho de README e as instruções de agendamento.
+   O `init` grava o `config.json` e imprime o trecho de README, as URLs dos 4 SVGs e as instruções de agendamento. Para escolher o modelo já aqui: `--model model-2` (veja [Modelos e cores](#modelos-e-cores)).
 
    **Contas novas do GitHub:** o e-mail de commit padrão (`usuario@users.noreply.github.com`) pode não vincular os commits ao seu perfil. Se isso acontecer, edite o `config.json` e defina `"commitEmail"` com o formato que inclui o ID numérico, `ID+usuario@users.noreply.github.com` (o ID aparece em Settings > Emails, ou em `https://api.github.com/users/seu-usuario`).
 3. Veja o que sairia, sem enviar nada:
@@ -80,7 +81,7 @@ Nos exemplos abaixo, `ai-usage-metrics` é o comando instalado. Com `npx`, escre
    ai-usage-metrics render
    ai-usage-metrics publish      # dry-run
    ```
-   Abra `~/.ai-usage-metrics/out/metrics.svg` no navegador para conferir o painel.
+   Abra `~/.ai-usage-metrics/out/metrics.svg` (ou `metrics.model-2.svg`, `metrics.model-3.svg`) no navegador para conferir o painel.
 4. Envie uma vez, conferindo a lista de arquivos, os números e os nomes públicos que o comando mostra:
    ```bash
    ai-usage-metrics publish --yes
@@ -90,12 +91,65 @@ Nos exemplos abaixo, `ai-usage-metrics` é o comando instalado. Com `npx`, escre
    ![AI usage](https://raw.githubusercontent.com/seu-usuario/ai-metrics/main/metrics.svg)
    ```
 
+## Modelos e cores
+
+São 3 modelos de SVG, todos gerados na sua máquina e enviados ao seu próprio repositório (sem servidor):
+
+| `model-1` (padrão): painel completo | `model-2`: cartão compacto | `model-3`: calendário de atividade |
+|---|---|---|
+| <img alt="model-1: cartões, sessões por mês e projetos com mais uso" src="examples/metrics.example.model-1.light.svg" width="300"> | <img alt="model-2: os 4 números e a barra de sessões por ferramenta" src="examples/metrics.example.model-2.light.svg" width="200"> | <img alt="model-3: mapa de calor das últimas 53 semanas" src="examples/metrics.example.model-3.light.svg" width="300"> |
+| <img alt="model-1, tema escuro" src="examples/metrics.example.model-1.dark.svg" width="300"> | <img alt="model-2, tema escuro" src="examples/metrics.example.model-2.dark.svg" width="200"> | <img alt="model-3, tema escuro" src="examples/metrics.example.model-3.dark.svg" width="300"> |
+
+O `publish` envia os 4 SVGs; escolha o modelo pela URL (sem rodar de novo). `metrics.svg` é o modelo definido em `model` na configuração:
+
+```markdown
+![AI usage](https://raw.githubusercontent.com/seu-usuario/ai-metrics/main/metrics.model-1.svg)
+![AI usage](https://raw.githubusercontent.com/seu-usuario/ai-metrics/main/metrics.model-2.svg)
+![AI usage](https://raw.githubusercontent.com/seu-usuario/ai-metrics/main/metrics.model-3.svg)
+```
+
+O `model-3` usa a métrica `sessions` (sessões por dia, em UTC) das últimas 53 semanas; os níveis de cor vêm dos quantis dos dias ativos. Detalhes em [`docs/modelos.md`](docs/modelos.md).
+
+### Cores
+
+Só cores são personalizáveis (nada de fonte, tamanho, raio ou layout). No `config.json`:
+
+| Chave de `colors` / `colorsDark` | O que pinta |
+|---|---|
+| `background` | fundo do painel |
+| `card` | fundo dos cartões de números |
+| `border` | bordas e linhas |
+| `text` | título e números |
+| `muted` | textos secundários |
+| `track` | fundo das barras |
+| `accent` | barras do ranking de projetos; também a base da escala de calor do `model-3` (derivada de `accent` e `background`) |
+| `tools` | mapa `idDaFerramenta -> cor` (ids de `ai-usage-metrics sources`: `claude-code`, `cline`, `chatgpt`) |
+
+`colors` vale para o tema claro e, com `theme: "auto"` e sem `colorsDark`, também para o escuro. `colorsDark` vale só para o escuro. Com `theme: "light"` só `colors` é usado; com `theme: "dark"`, `colorsDark` (ou `colors`, se ele não existir). Cada valor tem de ser **somente `#rgb` ou `#rrggbb`**: nomes de cor, `rgb()`, `var()`, `url()` e qualquer outra coisa são recusados, assim como chaves ou ferramentas desconhecidas.
+
+Tema escuro personalizado (fundo roxo, destaque verde):
+
+```json
+{
+  "model": "model-3",
+  "colorsDark": { "background": "#1a1033", "card": "#241747", "border": "#3b2a6b", "text": "#f3e8ff", "muted": "#b9a7e0", "track": "#2e1f5c", "accent": "#22c55e" }
+}
+```
+
+Tema claro:
+
+```json
+{ "theme": "light", "colors": { "accent": "#2563eb", "background": "#f8fafc", "tools": { "claude-code": "#1d4ed8" } } }
+```
+
+> **Legibilidade é por sua conta.** Não há ajuste automático de contraste: confira o SVG nos dois temas antes de publicar.
+
 ## Como funciona
 
 ```
 tarefa agendada (1x/dia)
   -> a CLI lê os registros locais, agrega e anonimiza
-  -> metrics.json + metrics.svg (gerados na sua máquina)
+  -> metrics.json + metrics.svg + metrics.model-1/2/3.svg (gerados na sua máquina)
   -> git push para <seu-usuario>/ai-metrics (repositório público seu)
   -> o README do perfil aponta para o SVG
 ```
@@ -109,8 +163,8 @@ Só a última etapa usa a rede (`git clone`, `fetch` e `push` para o remoto que 
 | `sources` | lista as fontes e se existem neste computador |
 | `report` | resumo no terminal. **Mostra nomes reais de projetos: não cole em lugar público** |
 | `export` | gera o JSON agregado e anonimizado (esquema v1, em [`docs/esquema.md`](docs/esquema.md)) |
-| `render` | gera o SVG a partir do JSON (`--theme auto\|light\|dark`, `--title`, `--lang en\|pt-BR`) |
-| `publish` | dry-run por padrão; com `--yes` (ou resposta interativa) envia o JSON e o SVG |
+| `render` | gera os SVGs a partir do JSON (`--theme auto\|light\|dark`, `--title`, `--lang en\|pt-BR`, `--model model-1\|model-2\|model-3`). Sem `--out`, grava `metrics.svg` e os três `metrics.model-N.svg` em `<state-dir>/out`; com `--out arquivo.svg`, grava só aquele arquivo; com `--out-dir pasta`, o conjunto completo nessa pasta |
+| `publish` | dry-run por padrão; com `--yes` (ou resposta interativa) envia o JSON e os 4 SVGs (5 arquivos) |
 | `init` | cria a configuração local e imprime o trecho de README e o agendamento |
 | `run` | `export`, `render` e `publish` numa etapa, para o agendador. No agendador use `--non-interactive` (nunca pergunta nada) |
 
@@ -130,6 +184,9 @@ O arquivo `config.json` aceita as chaves abaixo. Chaves desconhecidas são recus
 | `publicProjects` | `[]` | projetos que podem aparecer com nome: uma lista (`["meu-app"]`) ou um mapa (`{"pasta": "Nome público"}`). A chave do mapa pode ser o caminho completo, para separar pastas com o mesmo nome. Todo o resto é anonimizado |
 | `theme` | `auto` | `auto` (segue o tema do visitante), `light` ou `dark` |
 | `title` | (nenhum) | título do SVG, até 60 caracteres, sem caminho, e-mail nem nome de arquivo |
+| `model` | `model-1` | qual modelo vai em `metrics.svg`: `model-1`, `model-2` ou `model-3` (os três sempre são enviados também como `metrics.model-N.svg`) |
+| `colors` | (nenhum) | cores do tema claro (e do escuro no `auto`, se não houver `colorsDark`): `background`, `card`, `border`, `text`, `muted`, `track`, `accent` e `tools`; só `#rgb` ou `#rrggbb` |
+| `colorsDark` | (nenhum) | as mesmas chaves, só para o tema escuro |
 | `lang` | `en` | `en` ou `pt-BR` |
 | `autoPublish` | `false` | permite que `run` envie sem confirmação, no agendador |
 | `remoteUrl` | `https://github.com/<user>/<repo>.git` | outro remoto: só `https://host/caminho`, `git@host:caminho` ou `ssh://git@host/caminho`, sem usuário, senha nem token |
@@ -140,8 +197,8 @@ O arquivo `config.json` aceita as chaves abaixo. Chaves desconhecidas são recus
 
 O `publish` foi desenhado para que um envio acidental seja difícil:
 
-- **Dry-run por padrão.** Sem `--yes`, nada é enviado. Ele mostra o repositório e a branch, os arquivos (só `metrics.json` e `metrics.svg`), a diferença contra o que já está publicado, os números, quantos projetos estão anonimizados, **quais nomes ficariam públicos** e o **autor do commit**.
-- **Validação antes de enviar.** O JSON passa por uma allowlist estrita do esquema (qualquer campo extra, texto livre, caminho ou e-mail é rejeitado), pela barreira de privacidade e pela checagem dos nomes públicos. O SVG é gerado de novo a partir do JSON validado.
+- **Dry-run por padrão.** Sem `--yes`, nada é enviado. Ele mostra o repositório e a branch, os arquivos (só `metrics.json`, `metrics.svg` e `metrics.model-1.svg`, `metrics.model-2.svg`, `metrics.model-3.svg`: 5 arquivos planos na raiz do repositório de dados), a diferença contra o que já está publicado, os números, quantos projetos estão anonimizados, **quais nomes ficariam públicos** e o **autor do commit**.
+- **Validação antes de enviar.** O JSON passa por uma allowlist estrita do esquema (qualquer campo extra, texto livre, caminho ou e-mail é rejeitado), pela barreira de privacidade e pela checagem dos nomes públicos. Os 4 SVGs são gerados de novo a partir do JSON validado e passam pela barreira de privacidade; as cores são validadas (só hexadecimal).
 - **Nunca `--force`.** Se o remoto avançou de forma incompatível, o push falha e nada é sobrescrito.
 - **Sem token.** Usa o `git` e as credenciais que você já tem (gerenciador de credenciais ou SSH). Não pede, não guarda e não registra credenciais.
 - **Um único `metrics.json` agregado**, sem arquivo por projeto, para não criar uma linha do tempo detalhada no histórico do repositório.
@@ -185,10 +242,12 @@ O modelo de ameaças, as travas e como reportar uma vulnerabilidade estão em [`
 bin/        ponto de entrada da CLI
 src/        comandos, adaptadores das fontes, agregação, privacidade, publicação e SVG
 test/       testes com fixtures sintéticas e repositório git local como remoto
-docs/       esquema do JSON e fontes de dados
-examples/   JSON e SVG de exemplo (dados fictícios)
+docs/       esquema do JSON, fontes de dados, modelos e cores
+examples/   JSON e SVGs de exemplo dos 3 modelos (dados fictícios)
 templates/  workflow opcional do GitHub Actions
 ```
+
+O workflow opcional gera só o `metrics.svg` (com `render --out`, modelo e cores padrão, pois a configuração local não existe no repositório de dados).
 
 ## Contribuindo
 
@@ -206,7 +265,7 @@ O adaptador deve ler só campos estruturais e descartar qualquer texto.
 ```bash
 npm test         # node:test, fixtures sintéticas, repositório git bare local como remoto
 npm run lint     # checagem de sintaxe (node --check), sem dependências
-npm run exemplo  # regera examples/ (JSON e SVG sintéticos)
+npm run exemplo  # regera examples/ (JSON e SVGs sintéticos dos 3 modelos, claro e escuro)
 ```
 
 ### Workflow opcional do GitHub Actions
