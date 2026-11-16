@@ -284,7 +284,30 @@ test("render: gera o SVG a partir do JSON validado e recusa JSON inválido", asy
   await assert.rejects(a.cmd(["render", "--theme", "neon"]), /--theme/);
 });
 
-test("segurança do código: sem rede própria, sem --force, sem refspec forçado", async () => {
+/** Remove só comentários que ocupam a linha inteira (`//...` e blocos que começam no início da linha): nada de código escondido atrás de `//` dentro de string/regex. */
+const semComentariosDeLinha = (src) => src.replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, "").replace(/^[ \t]*\/\/.*$/gm, "");
+const REDE = "https?|http2|net|dns|tls|dgram|child_process";
+/** Módulos importados (com ou sem o prefixo `node:`; import estático/dinâmico, require, side-effect import). */
+function modulosImportados(src) {
+  const achados = [];
+  const re = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*|\bimport\s+)(["'`])((?:node:)?[A-Za-z0-9_:/.@-]+)\1/g;
+  for (const m of src.matchAll(re)) achados.push(m[2].replace(/^node:/, ""));
+  return achados;
+}
+
+test("varredura de imports: pega https/http/net/child_process com e sem 'node:' em import, import(), require e side-effect import", () => {
+  const casos = [
+    'import https from "https";', "import { request } from 'node:https';", 'import "https";', 'const h = require("https");', 'const h = require( "node:http" );',
+    'const m = await import("net");', 'import("child_process")', 'import cp from "node:child_process";', 'export * from "dns";',
+  ];
+  for (const c of casos) assert.ok(modulosImportados(c).some((m) => new RegExp(`^(${REDE})$`).test(m)), c);
+  assert.deepEqual(modulosImportados('import { join } from "node:path";\nimport x from "./a.mjs";'), ["path", "./a.mjs"]);
+  // comentário de linha inteira não conta; código com // dentro de string/regex continua sendo varrido
+  assert.equal(semComentariosDeLinha('// import "https";\n  /* import "net" */\nconst a = 1;').trim(), "const a = 1;");
+  assert.ok(modulosImportados(semComentariosDeLinha('const u = "http://x"; import "https"; // fim')).includes("https"));
+});
+
+test("segurança do código: rede só em ambiente.mjs (https), child_process só em publish.mjs e ambiente.mjs, sem --force, sem refspec forçado", async () => {
   const { readdir } = await import("node:fs/promises");
   const raiz = new URL("../src/", import.meta.url);
   const arquivos = [];
@@ -297,19 +320,26 @@ test("segurança do código: sem rede própria, sem --force, sem refspec forçad
   };
   await andar(raiz);
   assert.ok(arquivos.length > 5);
+  const usaHttps = [];
   for (const u of arquivos) {
-    const src = (await readFile(u, "utf8")).replace(/(?<!:)\/\/.*$/gm, ""); // sem comentários
-    // Única exceção de rede própria: o assistente `setup` faz UMA consulta HTTPS GET ao host fixo api.github.com (src/ambiente.mjs, documentada no SECURITY.md).
-    const ehAmbiente = u.pathname.endsWith("/src/ambiente.mjs");
-    assert.doesNotMatch(src, ehAmbiente ? /node:(http(?!s)|http2|net|dns|tls|dgram)/ : /node:(http|https|http2|net|dns|tls|dgram)/, u.pathname);
-    if (ehAmbiente) {
-      assert.equal((src.match(/node:https/g) ?? []).length, 1);
-      assert.match(src, /host: HOST_API/);
-      assert.match(src, /HOST_API = "api.github.com"/);
-      assert.match(src, /method: "GET"/);
-      assert.doesNotMatch(src, /method: "(?!GET)/);
+    const src = semComentariosDeLinha(await readFile(u, "utf8"));
+    const nome = u.pathname.split("/").pop();
+    const mods = modulosImportados(src);
+    for (const m of mods) {
+      if (m === "https") {
+        usaHttps.push(nome);
+        continue;
+      }
+      if (m === "child_process") {
+        assert.ok(["publish.mjs", "ambiente.mjs"].includes(nome), `${nome} não pode usar child_process`);
+        continue;
+      }
+      assert.doesNotMatch(m, /^(http|http2|net|dns|tls|dgram)$/, `${nome} importa ${m}`);
     }
-    assert.doesNotMatch(src, /\bfetch\(|XMLHttpRequest|WebSocket/, u.pathname);
-    assert.doesNotMatch(src, /--force|--force-with-lease|"-f"|"\+refs/, u.pathname);
+    assert.doesNotMatch(src, /\bfetch\(|XMLHttpRequest|WebSocket/, nome);
+    assert.doesNotMatch(src, /--force|--force-with-lease|"-f"|"\+refs/, nome);
   }
+  // Única exceção de rede própria: o assistente `setup` (src/ambiente.mjs), uma consulta HTTPS GET ao host fixo api.github.com.
+  // O comportamento (host, método e caminho efetivamente usados) é testado em test/ambiente.test.mjs com um `request` falso.
+  assert.deepEqual(usaHttps, ["ambiente.mjs"]);
 });
