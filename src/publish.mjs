@@ -202,6 +202,7 @@ export async function planejar({ config, caminhos, jsonPath, home }) {
   }
   // Só uma referência válida pelo esquema serve de comparação (a guarda de regressão olha a série, não os totais declarados).
   const anteriorJson = anterior && typeof anterior === "object" && validarMetricas(anterior).ok ? anterior : null;
+  const anteriorInvalido = antigos["metrics.json"] !== null && !anteriorJson; // existe no clone mas não serve de referência
 
   return {
     json,
@@ -213,6 +214,7 @@ export async function planejar({ config, caminhos, jsonPath, home }) {
     autor: autorDoCommit(config),
     cloneExiste: existsSync(join(caminhos.clone, ".git")),
     anteriorJson,
+    anteriorInvalido,
     anterior: anteriorJson
       ? { sessions: anteriorJson.totals.sessions, userMessages: anteriorJson.totals.userMessages, dias: anteriorJson.timeline.points.length, from: anteriorJson.period?.from ?? null, to: anteriorJson.period?.to ?? null }
       : anterior && typeof anterior === "object" && anterior.totals && Number.isSafeInteger(anterior.totals.sessions) && Number.isSafeInteger(anterior.totals.userMessages)
@@ -325,6 +327,9 @@ async function exigirPastaRepoSegura(caminhos) {
   throw new Error(`A pasta 'repo' do estado já existe e NÃO foi criada por esta ferramenta (sem o nosso marcador); recuso alterá-la ou apagá-la. ${orientacao}`);
 }
 
+/** Aviso explícito quando a guarda de perda de histórico não tem com o que comparar (não bloqueia: senão o primeiro publish travaria). */
+export const AVISO_SEM_REFERENCIA = (motivo) => `ATENÇÃO: sem referência válida para comparar (${motivo}): a proteção contra perda de histórico não pôde ser aplicada.`;
+
 /** Ambiente seguro do git (remoto validado, env por allowlist, sem hooks, cwd explícito): a mesma maquinaria do publish e do restore. */
 async function prepararGit({ config, caminhos, interativo }) {
   const remoto = validarRemoto(urlDoRemoto(config));
@@ -405,7 +410,9 @@ export async function enviar(plano, { config, caminhos, interativo, avisar = () 
     } catch {
       ref = null;
     }
-    const reg = ref && validarMetricas(ref).ok ? avaliarRegressao(plano.json, ref) : null;
+    const refValida = ref && validarMetricas(ref).ok;
+    if (atual && !refValida) avisar(AVISO_SEM_REFERENCIA("o metrics.json do repositório de dados é inválido, ilegível ou grande demais"));
+    const reg = refValida ? avaliarRegressao(plano.json, ref) : null;
     if (reg) {
       for (const l of linhasDeRegressao(reg)) avisar(l);
       return { enviado: false, bloqueado: true, motivo: "bloqueado pela guarda de regressão: o repositório de dados tem mais histórico que o JSON a enviar. Rode export de novo (sem --no-history/--since/--tool) ou, se for de propósito, confirme a perda de histórico" };

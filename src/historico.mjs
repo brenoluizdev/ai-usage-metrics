@@ -100,8 +100,34 @@ export function motivoCaminhoDeRede(caminho, plataforma = process.platform) {
 
 /** Mescla DOIS baselines válidos pelo máximo (usado para history.json + clone, restore e para manter o history.json monotônico). */
 export function mesclarBaselines(a, b, { avisar, hoje } = {}) {
+  const ids = new Set(ADAPTERS.map((x) => x.id));
+  a = sanearFerramentas(a, ids, avisar);
+  b = sanearFerramentas(b, ids, avisar);
   const [novo, velho] = a.generatedAt >= b.generatedAt ? [a, b] : [b, a];
   return mesclarHistorico(novo, velho, { tools: metaRegistro(), avisar, hoje });
+}
+
+/** Tira de um JSON as ferramentas fora do registro (com aviso) e recalcula o que dependia delas; sem ferramenta estranha devolve o próprio objeto. */
+function sanearFerramentas(j, ids, avisar) {
+  const fora = new Set([...j.tools.map((t) => t.id), ...j.timeline.points.flatMap((p) => Object.keys(p.byTool))].filter((id) => !ids.has(id)));
+  if (!fora.size) return j;
+  avisar?.(`histórico: ferramenta(s) fora do registro atual descartada(s): ${[...fora].sort().join(", ")}.`);
+  const points = j.timeline.points.map((p) => filtrarFerramentas(p, ids)).filter(Boolean);
+  const tools = j.tools.filter((t) => ids.has(t.id));
+  const tokens = tools.reduce((acc, t) => {
+    for (const k of TIPOS) acc[k] += t.tokens[k];
+    acc.total = soma(...TIPOS.map((k) => acc[k]));
+    return acc;
+  }, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 });
+  const datas = points.map((p) => p.date).sort();
+  return {
+    ...j,
+    period: datas.length ? { from: datas[0], to: datas.at(-1) } : null,
+    totals: { ...j.totals, sessions: soma(0, ...tools.map((t) => t.sessions)), userMessages: soma(0, ...tools.map((t) => t.userMessages)), assistantMessages: soma(0, ...tools.map((t) => t.assistantMessages)), activeDays: points.length, tokens },
+    tools,
+    projects: j.projects.map((p) => ({ ...p, tools: p.tools.filter((t) => ids.has(t.id)) })),
+    timeline: { ...j.timeline, points },
+  };
 }
 
 /**
@@ -162,16 +188,22 @@ export async function gravarBaseline(paths, texto, { home } = {}) {
  * `history reset`.
  */
 export async function gravarHistoricoMonotonico(paths, textoPublicado, { home, avisar } = {}) {
+  // Devolve true se gravou. Um history.json que existe mas está ilegível (antivírus, permissão...) NUNCA é sobrescrito sem avisar.
   const novo = validarTextoDeBaseline(textoPublicado, { home });
   if (!novo.ok) throw new Error(`não gravei o histórico: ${novo.motivo}.`);
   let final = novo.json;
   const prev = await lerArquivoLimitado(paths.historico);
-  if (prev && !prev.motivo) {
+  if (prev?.motivo) {
+    avisar?.(`ATENÇÃO: o history.json existe mas está ilegível (${prev.motivo}); NÃO foi atualizado, para não perder histórico. Corrija o arquivo (ou rode "history reset" se quiser descartá-lo); o publish em si continuou.`);
+    return false;
+  }
+  if (prev) {
     const v = validarTextoDeBaseline(prev.texto, { home });
     if (v.ok) final = mesclarBaselines(novo.json, v.json, { avisar }).json;
     else avisar?.(`histórico anterior ignorado ao atualizar o history.json: ${v.motivo}.`);
   }
   await gravarBaseline(paths, JSON.stringify(final, null, 2) + "\n", { home });
+  return true;
 }
 
 /** `history reset`: apaga o history.json (nunca segue link simbólico). Devolve true se existia. */

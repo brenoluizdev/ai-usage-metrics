@@ -11,7 +11,7 @@ import { adquirirLock } from "./lock.mjs";
 import { ARQUIVO_HISTORICO, apagarHistorico, carregarBaseline, gravarBaseline, gravarHistoricoMonotonico, lerArquivoLimitado, linhasDoHistorico, mesclarBaselines, mesclarHistorico, motivoCaminhoDeRede, normalizarMotivos, normalizarResumoGravado, validarTextoDeBaseline } from "./historico.mjs";
 import { FRASE_PERDA, MOTIVOS_VALIDOS, linhasDeRegressao, piorRegressao } from "./regressao.mjs";
 import { garantirSemVazamento, garantirSvgSemVazamento, lerAllowlist, validarTitulo } from "./privacy.mjs";
-import { baixarMetricasPublicadas, descreverPlano, enviar, planejar, semCredenciais } from "./publish.mjs";
+import { AVISO_SEM_REFERENCIA, baixarMetricasPublicadas, descreverPlano, enviar, planejar, semCredenciais } from "./publish.mjs";
 import { toPublic } from "./public.mjs";
 import { renderTerminal } from "./report.mjs";
 import { exigirMetricasValidas } from "./schema.mjs";
@@ -181,8 +181,9 @@ async function etapaExport({ adapters, ctx, home, config, destino, paths, out, h
   let resumoHist = { usado: false };
   // O baseline é carregado mesmo com a mescla desligada, só para avisar quando o JSON gerado fica MENOR que o histórico.
   let base = null;
+  const ignorados = [];
   try {
-    base = await carregarBaseline({ paths, config, home, avisar });
+    base = await carregarBaseline({ paths, config, home, avisar: (m) => (avisar(m), /^histórico ignorado: /.test(m) && ignorados.push(m.replace(/^histórico ignorado: /, "").replace(/\.$/, ""))) });
   } catch {
     avisar("histórico ignorado: não consegui ler o baseline.");
   }
@@ -198,6 +199,7 @@ async function etapaExport({ adapters, ctx, home, config, destino, paths, out, h
   exigirMetricasValidas(json);
   garantirSemVazamento(JSON.stringify(json), home); // barreira de privacidade sobre o resultado final
   const perda = base ? piorRegressao(json, [base.json]) : null;
+  if (!base && ignorados.length) out(AVISO_SEM_REFERENCIA(`o histórico local existe mas foi ignorado: ${ignorados.join("; ")}`));
   await gravar(destino, JSON.stringify(json, null, 2) + "\n");
   // Sempre na pasta de saída do estado (nunca ao lado de --out: não sobrescreve arquivo alheio). Só local; o publish repete na tela.
   await gravar(join(paths.saida, "avisos.json"), JSON.stringify([...lista]) + "\n");
@@ -265,13 +267,17 @@ async function etapaPublish({ config, paths, jsonPath, home, yes, dryRun, aceita
   if (hist) for (const l of linhasDoHistorico(hist)) out(`(do último export) ${l}`);
   // Guarda de regressão: compara com o melhor baseline local (history.json + clone) e com o metrics.json já publicado (anterior).
   let baseline = null;
+  const ignorados = [];
   try {
-    baseline = await carregarBaseline({ paths, config, home, avisar: (m) => out(`Aviso: ${m}`) });
+    baseline = await carregarBaseline({ paths, config, home, avisar: (m) => (out(`Aviso: ${m}`), /^histórico ignorado: /.test(m) && ignorados.push(m.replace(/^histórico ignorado: /, "").replace(/\.$/, ""))) });
   } catch {
     baseline = null;
   }
   const perda = piorRegressao(plano.json, [baseline?.json, plano.anteriorJson]);
   if (perda) for (const l of linhasDeRegressao(perda, motivos)) out(l);
+  if (!baseline && !plano.anteriorJson && (ignorados.length || plano.anteriorInvalido)) {
+    out(AVISO_SEM_REFERENCIA(ignorados.length ? `o histórico local existe mas foi ignorado: ${ignorados.join("; ")}` : "o metrics.json do clone é inválido, ilegível ou grande demais"));
+  }
   for (const av of await lerAvisosDoExport(paths)) out(`Aviso (do último export): ${av}`);
   const estado = await lerEstado(paths.estado);
   const atual = aprovacaoAtual(config, plano, home);
@@ -348,8 +354,8 @@ async function etapaPublish({ config, paths, jsonPath, home, yes, dryRun, aceita
   // monotônico, nunca encolhe. Nunca antes do envio dar certo.
   if ((r.enviado || r.jaPublicado) && config.history !== false) {
     try {
-      await gravarHistoricoMonotonico(paths, plano.arquivos.find((a) => a.nome === "metrics.json").conteudo, { home, avisar: (m) => out(`Aviso: ${m}`) });
-      out(`Histórico local atualizado (${ARQUIVO_HISTORICO}).`);
+      const gravou = await gravarHistoricoMonotonico(paths, plano.arquivos.find((a) => a.nome === "metrics.json").conteudo, { home, avisar: (m) => out(`Aviso: ${m}`) });
+      if (gravou) out(`Histórico local atualizado (${ARQUIVO_HISTORICO}).`);
     } catch (e) {
       out(`Aviso: não consegui atualizar o histórico local: ${limparAviso(e.message)}`);
     }
@@ -578,7 +584,11 @@ async function cmdRestore({ args, config, paths, home, io, out }) {
   if (atual && !atual.motivo) {
     const va = validarTextoDeBaseline(atual.texto, { home });
     if (va.ok) {
-      final = mesclarBaselines(v.json, va.json).json;
+      try {
+        final = mesclarBaselines(v.json, va.json, { avisar: (m) => out(`Aviso: ${m}`) }).json;
+      } catch {
+        throw new Error("restore: não consegui mesclar o JSON restaurado com o histórico local (formato inesperado). Nada foi gravado; o history.json atual continua como estava.");
+      }
       const f = (j) => `${j.timeline.points.length} dias, ${j.totals.sessions} sessões, ${j.totals.userMessages} mensagens, ${j.totals.tokens.total} tokens`;
       out(`Já existe um histórico local. Comparação (o restaurado nunca reduz o local; vale o máximo):`);
       out(`  local atual: ${f(va.json)}`);
