@@ -218,9 +218,10 @@ export function normalizarRemoto(url) {
 }
 
 const SUFIXO_NOREPLY = "@users.noreply.github.com";
-// Sem \p{Cc} (C0, DEL e C1: inclui ESC e U+009B) em nenhum dos dois: o valor vai para a tela e para o histórico público.
-const EMAIL_COMMIT = /^(?!.*\p{Cc})[^\s@<>,;:"'\\]{1,64}@[A-Za-z0-9.-]{1,190}$/u;
-const NOME_COMMIT = /^(?!.*\p{Cc})[^<>\\]{1,100}$/u;
+// Sem controle (\p{Cc}: C0, DEL e C1, inclui ESC e U+009B), sem formatação (\p{Cf}: bidi U+202A-202E/U+2066-2069, zero-width U+200B-200F, U+FEFF)
+// e sem separadores de linha/parágrafo (\p{Zl}/\p{Zp}) em nenhum dos dois: o valor vai para a tela e para o histórico público.
+const EMAIL_COMMIT = /^(?!.*[\p{Cc}\p{Cf}\p{Zl}\p{Zp}])[^\s@<>,;:"'\\]{1,64}@[A-Za-z0-9.-]{1,190}$/u;
+const NOME_COMMIT = /^(?!.*[\p{Cc}\p{Cf}\p{Zl}\p{Zp}])[^<>\\]{1,100}$/u;
 
 /** Autor/committer que irá para o histórico público. Padrão: <githubUser>@users.noreply.github.com. */
 export function autorDoCommit(c) {

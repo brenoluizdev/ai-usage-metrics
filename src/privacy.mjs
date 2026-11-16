@@ -7,7 +7,8 @@ import { basename } from "node:path";
 
 const ALIAS_VALIDO = /^[\p{L}\p{N} ._+-]{1,60}$/u;
 // eslint-disable-next-line no-control-regex
-const CONTROLE = /[\u0000-\u001F\u007F-\u009F]/;
+// Controle (C0/DEL/C1), formatação (bidi, zero-width: \p{Cf}) e separadores de linha/parágrafo (\p{Zl}/\p{Zp}): nada disso em título nem em pasta.
+const CONTROLE = /[\u0000-\u001F\u007F-\u009F\p{Cf}\p{Zl}\p{Zp}]/u;
 
 /** Barras normalizadas, sem barra final (uso interno). Devolve { texto, partes, pessoal } ou null. */
 function partesDoProjeto(cwd, home) {
