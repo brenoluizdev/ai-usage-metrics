@@ -294,6 +294,7 @@ class Assistente {
       this.carregar(ex);
       out("");
       out(`Configuração atual: ${ex.githubUser}/${ex.dataRepo}, modelo ${ex.model ?? MODELO_PADRAO}, ${Object.keys(lerAllowlistSegura(ex, this.home)).length} projeto(s) com nome público.`);
+      out(config_history_msg(ex));
       const o = await this.menu("O que você quer fazer?", ["Rever tudo (Enter mantém o valor atual em cada pergunta)", "Só mudar modelo e cores", "Sair sem mudar nada"], 0);
       if (o === 2) return out("Nada foi alterado.");
       rapido = o === 1;
@@ -634,9 +635,11 @@ class Assistente {
   // 6) histórico
   async etapaHistorico() {
     const { out, d } = this;
-    if (!["publico", "privado", "desconhecido"].includes(d.repoEstado) || (await existe(this.paths.historico))) return;
+    if (!["publico", "privado", "desconhecido", "personalizado"].includes(d.repoEstado)) return;
+    const local = await existe(this.paths.historico);
     this.etapa(6, "Histórico (computador novo)");
     out("Se você já publicou deste repositório em outro computador, dá para recuperar o histórico para o gráfico não recomeçar do zero.");
+    if (local) out("  Já existe um histórico local: o restore nunca o reduz (mescla pelo máximo e mostra a comparação antes de gravar).");
     if (!(await this.sim("Este é um computador novo, e o repositório já tem um painel publicado?"))) return;
     d.restore = await this.sim(`Executar o restore depois do resumo: baixar o último metrics.json de ${urlDoRemoto({ githubUser: d.githubUser, dataRepo: d.dataRepo })} com git (REDE)?`);
   }
@@ -780,7 +783,7 @@ class Assistente {
     this.publicou = false;
     try {
       await this.comLock(async () => {
-        await etapas.etapaExport({ adapters: ADAPTERS, ctx: { home, since: undefined }, home, config, destino: paths.json, paths, out, historico: config.history !== false });
+        await etapas.etapaExport({ adapters: ADAPTERS, ctx: { home, since: undefined }, home, config, destino: paths.json, paths, out, historico: config.history !== false, motivos: config.history === false ? ["config"] : [] });
         await etapas.etapaRender({ jsonPath: paths.json, svgPath: paths.svg, dirModelos: paths.saida, opcoes: opcoesSvg(config), home, out });
         const r = await etapas.etapaPublish({ config, paths, jsonPath: paths.json, home, yes: false, dryRun: false, aceitaEmail: false, io: this.io, out, modo: "manual" });
         this.publicou = Boolean(r?.enviado || r?.jaPublicado);
@@ -812,6 +815,13 @@ class Assistente {
     out("Para refazer: `ai-usage-metrics setup` de novo (os valores atuais viram o padrão). Para mudar cores/modelo à mão, edite \"colors\", \"colorsDark\" e \"model\" no config.json (veja docs/modelos.md).");
     out(`Para remover a tarefa agendada: schtasks /Delete /TN "${NOME_TAREFA}"`);
   }
+}
+
+/** Uma frase simples sobre o histórico (reexecução). Nada é automatizado aqui. */
+function config_history_msg(c) {
+  return c.history === false
+    ? "O histórico está DESLIGADO na configuração (\"history\": false); o assistente mantém isso."
+    : "O seu histórico é preservado: a série diária só cresce a cada publicação. Para recomeçar do zero use, por sua conta, `ai-usage-metrics history reset` (apaga só o history.json local, com confirmação).";
 }
 
 /** lerAllowlist que nunca lança (para só MOSTRAR escolhas): devolve { pasta: alias }. */

@@ -83,6 +83,7 @@ Ele pergunta, passo a passo, o que precisa e leva você do zero até o primeiro 
 - **Cada ação externa tem a sua confirmação `[s/N]` (padrão N)**, descrevendo o que vai acontecer: consultar o `gh`, consultar a API pública do GitHub, criar o repositório de dados (**público**), `restore` do histórico, instalar uma cópia fixa do pacote com `npm install`, criar a tarefa agendada e publicar. Nada disso acontece sem o seu "s".
 - **O `gh` é opcional.** Toda etapa tem o caminho manual equivalente. A ferramenta nunca lê, pede, guarda nem imprime token.
 - **Nada é gravado antes do resumo final** (exceto as prévias dos SVGs em `<state-dir>/out/preview/`). A configuração é gravada de forma atômica e, ao reconfigurar, a anterior vira `config.json.bak`.
+- **Histórico**: o publish do assistente passa pela guarda de regressão (frase exata para publicar com perda) e o `restore` dele mescla sem encolher o histórico local.
 - **Refazer**: rode `setup` de novo; os valores atuais viram o padrão (Enter mantém) e há a opção "só mudar modelo e cores".
 - **Windows**: se o pacote está no cache do `npx` (o agendamento quebraria quando o cache for limpo), o assistente oferece instalar uma cópia fixa em `~/.ai-usage-metrics-runtime` e agenda a partir dela. Linux/macOS: imprime a linha de `cron` (não validada).
 

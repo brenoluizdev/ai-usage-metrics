@@ -28,17 +28,17 @@ npx ai-usage-metrics setup [--state-dir <pasta>] [--config <arquivo>] [--home <p
 4. **Repositório de dados** (padrão `ai-metrics`): verifica se existe (`gh repo view` ou GET `/repos/<usuário>/<repo>`, cada um com consentimento). Público: ok. Privado: avisa que a imagem não aparecerá no README para os outros. Inexistente: com `gh` oferece criá-lo (**público e vazio**; só depois do resumo); sem `gh` mostra o passo manual.
 5. **Projetos com nome público**: lista até 15 pastas detectadas (nomes reais, só no terminal), pergunta quais podem aparecer com nome e o alias de cada, com o aviso de que nome público é permanente no histórico do GitHub. Padrão: nenhum.
 6. **Modelo e cores**: descreve os 3 modelos, gera prévias dos SVGs com os seus dados em `<state-dir>/out/preview/` (no Windows oferece abri-las no navegador) e repete até você aprovar. Paletas prontas (GitHub padrão, Dracula, Nord, Solarized) ou personalizar destaque e fundos em hexadecimal. Depois: idioma, tema e título. O `model-2` pede `width="420"` no README do perfil.
-7. **Histórico (computador novo)**: se o repositório já existe e não há `history.json` local, pergunta se este é um computador novo e oferece o `restore` (rede, git; executado depois do resumo).
+7. **Histórico (computador novo)**: se o repositório já existe (ou é um remoto próprio da configuração), pergunta se este é um computador novo e oferece o `restore` (rede, git; executado depois do resumo). É o `restore` que **mescla pelo máximo**: com um `history.json` local já existente ele nunca o reduz, mostra a comparação local/restaurado/resultado e só então grava.
 8. **Agendamento**: horário (padrão 12:00) e `autoPublish`. No Windows cria a tarefa `ai-usage-metrics` pelo `schtasks` (com consentimento); se já existir, pergunta se substitui e reconfirma antes de agir. Em Linux/macOS só **imprime** a linha de `cron`, que o autor não validou.
 9. **Resumo**: mostra tudo (sem segredos) e pede confirmação. Só então grava o `config.json` (atômico, com cópia `.bak` se já existia) e executa as ações marcadas, nesta ordem: criar repositório, restore, instalar a cópia fixa, criar a tarefa.
-10. **Primeira publicação**: `export`, `render` e o dry-run real do `publish`; o `publish` manual pergunta `[s/N]`. Com "s" envia e registra a aprovação do envio automático (estamos num terminal interativo). Com "n" explica como aprovar depois (`publish` num terminal).
+10. **Primeira publicação**: `export`, `render` e o dry-run real do `publish`; o `publish` manual pergunta `[s/N]`. A **guarda de regressão de histórico** do `publish` vale integralmente: se o dry-run mostrar `ATENÇÃO: PERDA DE HISTÓRICO`, o fluxo normal pede a frase exata `publicar com perda de histórico`; o assistente nunca passa `--yes` nem `--accept-history-loss` e nunca digita a frase por você (sem a frase, nada é enviado). Com "s" envia e registra a aprovação do envio automático (estamos num terminal interativo). Com "n" explica como aprovar depois (`publish` num terminal).
 11. **Fim**: URLs dos 4 SVGs, trecho de Markdown pronto para o perfil, como refazer, como mudar cores/modelo à mão e como remover a tarefa.
 
 Os passos pulados na reexecução rápida não deixam buracos na numeração mostrada na tela.
 
 ## Reexecução
 
-Se já existe `config.json`, o assistente mostra a configuração atual e oferece: rever tudo (cada pergunta usa o valor atual como padrão), só mudar modelo e cores, ou sair. Chaves que ele não pergunta (`history`, `branch`, `remoteUrl`) são preservadas; um `commitEmail` que não seja noreply também. A configuração anterior vira `config.json.bak`.
+Se já existe `config.json`, o assistente mostra a configuração atual e oferece: rever tudo (cada pergunta usa o valor atual como padrão), só mudar modelo e cores, ou sair. Chaves que ele não pergunta (`history`, `branch`, `remoteUrl`) são preservadas (a tela diz, em uma frase, que o histórico é preservado e que `ai-usage-metrics history reset` recomeça do zero por conta própria; o assistente não automatiza isso); um `commitEmail` que não seja noreply também. A configuração anterior vira `config.json.bak`.
 
 ## Decisões
 
