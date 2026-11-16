@@ -167,6 +167,9 @@ Só a última etapa usa a rede (`git clone`, `fetch` e `push` para o remoto que 
 | `publish` | dry-run por padrão; com `--yes` (ou resposta interativa) envia o JSON e os 4 SVGs (5 arquivos) |
 | `init` | cria a configuração local e imprime o trecho de README e o agendamento |
 | `run` | `export`, `render` e `publish` numa etapa, para o agendador. No agendador use `--non-interactive` (nunca pergunta nada) |
+| `restore` | computador novo: baixa o último `metrics.json` publicado no seu repositório de dados e o grava como histórico local (`history.json`). É rede: pede confirmação (`[s/N]` ou `--yes`). `restore --from-file <json>` faz o mesmo 100% offline |
+
+`export` aceita `--no-history` (não mescla com o histórico só nesta execução). Veja "Histórico e computador novo".
 
 Opções gerais: `--state-dir <pasta>`, `--config <arquivo>`, `--since <30d|AAAA-MM-DD>`, `--tool <id>` (repetível) e `--top <n>`. Rode `--help` para a lista completa.
 
@@ -188,10 +191,28 @@ O arquivo `config.json` aceita as chaves abaixo. Chaves desconhecidas são recus
 | `colors` | (nenhum) | cores do tema claro (e do escuro no `auto`, se não houver `colorsDark`): `background`, `card`, `border`, `text`, `muted`, `track`, `accent` e `tools`; só `#rgb` ou `#rrggbb` |
 | `colorsDark` | (nenhum) | as mesmas chaves, só para o tema escuro |
 | `lang` | `en` | `en` ou `pt-BR` |
+| `history` | `true` | mescla a série diária com o último JSON publicado (veja "Histórico e computador novo"); `false` desliga |
 | `autoPublish` | `false` | permite que `run` envie sem confirmação, no agendador |
 | `remoteUrl` | `https://github.com/<user>/<repo>.git` | outro remoto: só `https://host/caminho`, `git@host:caminho` ou `ssh://git@host/caminho`, sem usuário, senha nem token |
 | `commitName` | `githubUser` | nome do autor do commit público |
 | `commitEmail` | `<githubUser>@users.noreply.github.com` | e-mail do autor do commit público. Qualquer e-mail que não seja o noreply do GitHub exige confirmação extra |
+
+## Histórico e computador novo
+
+Sem histórico, cada `export` usaria só os registros que existem agora, e o painel perderia dias se você formatasse o PC, trocasse de computador ou se o Claude Code apagasse sessões antigas. Por isso o `export` (e o `run`) **mescla a série diária** com a do último `metrics.json` publicado (guardado em `~/.ai-usage-metrics/history.json` depois de cada envio bem-sucedido, ou lido do clone local de dados). Desligue com `"history": false` ou `export --no-history`.
+
+- **O que é preservado:** a série diária (sessões, mensagens, tokens por dia e por ferramenta), os totais, o período, os dias ativos e os dados por ferramenta, recalculados a partir da série mesclada.
+- **O que NÃO é preservado:** o **ranking de projetos** (`projects` e `totals.projects`) vem só dos registros locais. Os nomes anonimizados `projeto-privado-N` não têm identidade estável entre execuções, então não dá para restaurá-los. Os totais de tokens por tipo (entrada/saída/cache) dos dias restaurados são aproximados (a série guarda só o total por dia), e `sessions` pode ser um pouco superestimado para sessões de vários dias que só existem no histórico.
+- **Como o máximo funciona:** se um dia existe nos dois lados, vale o **maior** valor de cada campo. As contagens de um dia só crescem e os registros locais podem ter sido apagados em parte, então o menor valor é o que perdeu dados; somar contaria o mesmo dia duas vezes. Reaplicar a mescla não infla nada (exportar duas vezes dá o mesmo JSON, exceto `generatedAt`).
+- **Avisos:** o `export` e o dry-run do `publish` dizem quantos dias vieram só do histórico, quantos são só locais e quantos foram elevados, e avisam em destaque quando os registros locais têm muito menos dias que o histórico.
+- Nada disso publica mais do que já era público (a série diária). Detalhes do algoritmo: [`docs/historico.md`](docs/historico.md).
+
+### Computador novo (ou PC formatado)
+
+1. Instale o Node 24+ e o pacote (`npm install -g ai-usage-metrics`).
+2. `ai-usage-metrics init --user <seu-usuario>` (com o mesmo repositório de dados de antes).
+3. `ai-usage-metrics restore` (confirme com `s`, ou use `--yes`). Ele baixa o último `metrics.json` do SEU repositório, valida e grava o `history.json`. Sem rede: `restore --from-file <metrics.json>`.
+4. `ai-usage-metrics run` (ou `export`, `render` e `publish`): o painel mantém a série e os totais antigos e soma o que este computador registrar daqui para a frente.
 
 ## Publicação segura
 
@@ -234,6 +255,7 @@ O modelo de ameaças, as travas e como reportar uma vulnerabilidade estão em [`
 - **Validado apenas no Windows.** Linux e macOS usam `os.homedir()` e `path`, mas não foram testados: trate como não suportados até alguém confirmar.
 - **Os formatos das ferramentas mudam.** Claude Code, Cline e o app do ChatGPT não documentam seus arquivos locais. Uma atualização pode quebrar um adaptador ou subcontar (o Claude Code, por exemplo, apaga sessões antigas por idade).
 - Os números são aproximados e as datas estão em UTC.
+- O histórico só preserva a série diária e os totais; o ranking de projetos não é restaurado (veja "Histórico e computador novo").
 - O ChatGPT cobre só o que o app desktop sincronizou, e só a contagem por dia.
 
 ## Estrutura do projeto

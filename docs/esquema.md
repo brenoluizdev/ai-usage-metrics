@@ -1,5 +1,7 @@
 # Esquema do JSON agregado (versão 1)
 
+Com o histórico ligado (padrão), `timeline.points` e os totais derivados dela podem incluir dias do último JSON publicado: veja [`historico.md`](historico.md). O esquema não muda.
+
 Gerado por `ai-usage-metrics export` e validado por `src/schema.mjs` (fonte da verdade; tipos JSDoc em `src/types.mjs`). Mudança incompatível = novo `schemaVersion`.
 
 ```jsonc
