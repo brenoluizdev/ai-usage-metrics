@@ -9,7 +9,7 @@ import { IDIOMAS, MODELOS, TEMAS } from "./svg.mjs";
 
 export const PADROES = Object.freeze({ dataRepo: "ai-metrics", branch: "main", theme: "auto", lang: "en", autoPublish: false });
 
-const CHAVES = ["githubUser", "dataRepo", "branch", "remoteUrl", "publicProjects", "theme", "title", "lang", "autoPublish", "commitName", "commitEmail", "model", "colors", "colorsDark"];
+const CHAVES = ["githubUser", "dataRepo", "branch", "remoteUrl", "publicProjects", "theme", "title", "lang", "autoPublish", "commitName", "commitEmail", "model", "colors", "colorsDark", "history"];
 const USUARIO_GITHUB = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const NOME_REPO = /^[A-Za-z0-9._-]{1,100}$/;
 const BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,60}$/;
@@ -21,6 +21,7 @@ export const caminhos = (stateDir) => ({
   dir: stateDir,
   config: join(stateDir, "config.json"),
   estado: join(stateDir, "state.json"),
+  historico: join(stateDir, "history.json"), // cópia validada do último metrics.json publicado (baseline do histórico)
   clone: join(stateDir, "repo"),
   saida: join(stateDir, "out"),
   json: join(stateDir, "out", "metrics.json"),
@@ -256,6 +257,7 @@ export function normalizarConfig(bruto) {
       throw new Error(`Configuração: ${e.message}`);
     }
   }
+  if (c.history !== undefined && typeof c.history !== "boolean") throw new Error("Configuração: history deve ser true ou false (padrão true).");
   if (typeof c.autoPublish !== "boolean") throw new Error("Configuração: autoPublish deve ser true ou false.");
   if (c.commitName !== undefined && (typeof c.commitName !== "string" || !NOME_COMMIT.test(c.commitName))) throw new Error("Configuração: commitName inválido (até 100 caracteres, sem < > nem caracteres de controle).");
   if (c.commitEmail !== undefined && (typeof c.commitEmail !== "string" || !EMAIL_COMMIT.test(c.commitEmail))) throw new Error("Configuração: commitEmail inválido.");

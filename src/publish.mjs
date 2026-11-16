@@ -2,7 +2,7 @@
 // repositório de dados do próprio usuário usando o `git` dele. Nunca usa --force, nunca lida com tokens.
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -93,14 +93,15 @@ export async function exigirArquivoSeguro(arquivo, lstatFn = lstat) {
 }
 
 /** Escrita atômica: arquivo temporário exclusivo na mesma pasta + rename. Nunca segue symlink no destino. */
-export async function escreverAtomico(dir, nome, conteudo) {
+export async function escreverAtomico(dir, nome, conteudo, { mode } = {}) {
   const alvo = join(dir, nome);
   await exigirArquivoSeguro(alvo);
   const tmp = join(dir, `.${nome}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
   try {
-    await writeFile(tmp, conteudo, { encoding: "utf8", flag: "wx" });
+    await writeFile(tmp, conteudo, { encoding: "utf8", flag: "wx", ...(mode === undefined ? {} : { mode }) });
     await exigirArquivoSeguro(alvo); // de novo, logo antes de trocar
     await rename(tmp, alvo);
+    if (mode !== undefined) await chmod(alvo, mode).catch(() => {}); // no Windows o modo quase não tem efeito (valem as ACLs do perfil)
   } catch (e) {
     await rm(tmp, { force: true });
     throw e;
@@ -315,14 +316,8 @@ async function exigirPastaRepoSegura(caminhos) {
   throw new Error(`A pasta 'repo' do estado já existe e NÃO foi criada por esta ferramenta (sem o nosso marcador); recuso alterá-la ou apagá-la. ${orientacao}`);
 }
 
-/**
- * Sincroniza o clone local, escreve os arquivos de ARQUIVOS, faz commit e push (sem force).
- * O clone em cache é só nosso: antes de escrever ele é alinhado ao remoto (checkout -B local, nunca force no remoto).
- * Proteções: remoto validado (https/ssh), ambiente do git por allowlist, hooks do usuário desligados, symlinks recusados,
- * escrita atômica, autor do commit explícito (padrão: noreply do GitHub).
- * @returns {Promise<{ enviado: boolean, motivo?: string }>}
- */
-export async function enviar(plano, { config, caminhos, interativo, avisar = () => {} }) {
+/** Ambiente seguro do git (remoto validado, env por allowlist, sem hooks, cwd explícito): a mesma maquinaria do publish e do restore. */
+async function prepararGit({ config, caminhos, interativo }) {
   const remoto = validarRemoto(urlDoRemoto(config));
   const autor = autorDoCommit(config);
   const semHooks = join(caminhos.dir, "sem-hooks");
@@ -335,7 +330,16 @@ export async function enviar(plano, { config, caminhos, interativo, avisar = () 
   const dotGit = join(caminhos.clone, ".git");
   // --git-dir/--work-tree explícitos: o git nunca "sobe" para uma pasta-mãe que por acaso seja outro repositório.
   const g = (args, opts = {}) => git([...seguras, `--git-dir=${dotGit}`, `--work-tree=${caminhos.clone}`, ...args], { cwd: caminhos.clone, env, ...opts });
+  return { remoto, autor, env, seguras, dotGit, g };
+}
 
+/**
+ * Deixa o clone local (só nosso) alinhado ao remoto: confere a posse, clona ou busca (rede), recusa alterações e metrics.* que não
+ * sejam arquivos comuns. `criarBranchLocal`: o publish cria a branch local mesmo se o remoto ainda não tem; o restore não.
+ * @returns {Promise<{ temRemota: boolean, modos: () => Promise<string[]> }>}
+ */
+async function sincronizarClone({ config, caminhos, ctx, avisar, criarBranchLocal }) {
+  const { remoto, env, seguras, dotGit, g } = ctx;
   // 0) A pasta 'repo' só é tocada se for NOSSA (marcador). Nada é apagado: um clone nosso divergente é RENOMEADO.
   await exigirPastaRepoSegura(caminhos);
   // 1) Antes de QUALQUER comando git no clone: ele e o .git têm de ser pastas de verdade e a config tem de ser a que nós criamos.
@@ -362,11 +366,25 @@ export async function enviar(plano, { config, caminhos, interativo, avisar = () 
     () => false,
   );
   if (temRemota) await g(["checkout", "--quiet", "-B", config.branch, `origin/${config.branch}`]);
-  else await g(["checkout", "--quiet", "-B", config.branch]);
+  else if (criarBranchLocal) await g(["checkout", "--quiet", "-B", config.branch]);
 
   // Se o remoto traz metrics.* como link simbólico (modo 120000) ou outra coisa que não arquivo comum, recuso.
   const modos = async () => (await g(["ls-files", "-s", "--", ...ARQUIVOS])).split("\n").filter(Boolean).map((l) => l.split(/\s+/)[0]);
   if ((await modos()).some((m) => m !== "100644" && m !== "100755")) throw new Error("O repositório de dados tem metrics.json/metrics*.svg que não são arquivos comuns (link simbólico?). Recuso; corrija o repositório.");
+  return { temRemota, modos };
+}
+
+/**
+ * Sincroniza o clone local, escreve os arquivos de ARQUIVOS, faz commit e push (sem force).
+ * O clone em cache é só nosso: antes de escrever ele é alinhado ao remoto (checkout -B local, nunca force no remoto).
+ * Proteções: remoto validado (https/ssh), ambiente do git por allowlist, hooks do usuário desligados, symlinks recusados,
+ * escrita atômica, autor do commit explícito (padrão: noreply do GitHub).
+ * @returns {Promise<{ enviado: boolean, motivo?: string, jaPublicado?: boolean }>}
+ */
+export async function enviar(plano, { config, caminhos, interativo, avisar = () => {} }) {
+  const ctx = await prepararGit({ config, caminhos, interativo });
+  const { remoto, g } = ctx;
+  const { modos } = await sincronizarClone({ config, caminhos, ctx, avisar, criarBranchLocal: true });
 
   for (const a of plano.arquivos) await escreverAtomico(caminhos.clone, a.nome, a.conteudo);
   await g(["add", "--", ...ARQUIVOS]);
@@ -375,11 +393,72 @@ export async function enviar(plano, { config, caminhos, interativo, avisar = () 
     () => false,
     () => true,
   );
-  if (!mudou) return { enviado: false, motivo: "nada mudou desde o último envio" };
+  if (!mudou) return { enviado: false, motivo: "nada mudou desde o último envio", jaPublicado: true };
 
   await g(["commit", "--quiet", "--no-verify", "-m", MENSAGEM_DE_COMMIT]);
   // Sem --force e sem refspec com "+": se o remoto avançou, o push é recusado e nada é sobrescrito.
   // O destino é a URL APROVADA (não o nome "origin"): assim um remote.origin.pushurl no clone nunca desvia o envio.
   await g(["push", "--quiet", "--no-verify", remoto, `refs/heads/${config.branch}:refs/heads/${config.branch}`]);
   return { enviado: true };
+}
+
+const MAX_BYTES_METRICS = 5 * 1024 * 1024;
+
+async function lerMetricasLimitado(clone) {
+  const arquivo = join(clone, "metrics.json");
+  let st;
+  try {
+    st = await lstat(arquivo);
+  } catch (e) {
+    if (e.code === "ENOENT") return null;
+    return { motivo: "ilegível" };
+  }
+  if (st.isSymbolicLink() || !st.isFile()) return { motivo: "metrics.json do clone não é um arquivo comum" };
+  if (st.size > MAX_BYTES_METRICS) return { motivo: "grande demais (mais de 5 MiB)" };
+  return { texto: await readFile(arquivo, "utf8") };
+}
+
+/**
+ * Lê (SEM rede e sem rodar nada do clone) o metrics.json do clone local em cache, só se o clone for nosso: marcador de posse válido,
+ * .git de verdade, config só com as chaves esperadas, remoto igual ao configurado e branch igual à configurada.
+ * @returns {Promise<{ texto: string } | { motivo: string } | null>} null = não há clone nem arquivo
+ */
+export async function lerMetricasDoClone({ config, caminhos }) {
+  let st;
+  try {
+    st = await lstat(caminhos.clone);
+  } catch (e) {
+    if (e.code === "ENOENT") return null;
+    throw e;
+  }
+  if (st.isSymbolicLink() || !st.isDirectory()) return { motivo: "o clone local é um link simbólico ou não é pasta" };
+  if (!(await cloneEhNosso(caminhos.dir, caminhos.clone))) return { motivo: "o clone local não foi criado por esta ferramenta" };
+  const ctx = await prepararGit({ config, caminhos, interativo: false });
+  const problema = await problemaNoClone({ caminhos, dotGit: ctx.dotGit, remoto: ctx.remoto, env: ctx.env, seguras: ctx.seguras });
+  if (problema) return { motivo: problema };
+  if (existsSync(ctx.dotGit)) {
+    let atual;
+    try {
+      atual = (await ctx.g(["symbolic-ref", "--short", "HEAD"])).trim();
+    } catch {
+      return { motivo: "o clone local está sem branch" };
+    }
+    if (atual !== config.branch) return { motivo: "o clone local está em outra branch" };
+  }
+  return lerMetricasLimitado(caminhos.clone);
+}
+
+/**
+ * RESTORE (rede): baixa o último metrics.json publicado com a MESMA maquinaria do publish (remoto validado, ambiente do git limpo,
+ * protocolos permitidos, clone marcado, cwd explícito, sem hooks, sem token). Só lê; nunca faz commit nem push.
+ * @returns {Promise<{ vazio: boolean, texto?: string, motivo?: string }>}
+ */
+export async function baixarMetricasPublicadas({ config, caminhos, interativo, avisar = () => {} }) {
+  const ctx = await prepararGit({ config, caminhos, interativo });
+  const { temRemota } = await sincronizarClone({ config, caminhos, ctx, avisar, criarBranchLocal: false });
+  if (!temRemota) return { vazio: true, motivo: "o repositório de dados está vazio (ou não tem a branch configurada)" };
+  const r = await lerMetricasLimitado(caminhos.clone);
+  if (r === null) return { vazio: true, motivo: "o repositório de dados não tem metrics.json" };
+  if (r.motivo) return { vazio: true, motivo: r.motivo };
+  return { vazio: false, texto: r.texto };
 }
