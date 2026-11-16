@@ -211,7 +211,7 @@ test("mescla: respeita o teto de pontos do esquema (mais recentes) com aviso", a
   assert.equal(json.timeline.points.length, 4000);
   assert.equal(json.timeline.points.at(-1).date, "2026-03-05");
   assert.ok(avisos.some((a) => /4000 mais recentes/.test(a)));
-  assert.ok(json.totals.activeDays >= 4001);
+  assert.equal(json.totals.activeDays, 4000);
   exigirMetricasValidas(json);
 });
 

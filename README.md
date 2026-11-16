@@ -191,9 +191,10 @@ Só a última etapa usa a rede (`git clone`, `fetch` e `push` para o remoto que 
 | `setup` | **assistente interativo (recomendado)**: guia do zero até o primeiro painel publicado e o agendamento. Só em terminal; cada ação externa pede `[s/N]` |
 | `init` | (automação/avançado) cria a configuração local por flags e imprime o trecho de README e o agendamento |
 | `run` | `export`, `render` e `publish` numa etapa, para o agendador. No agendador use `--non-interactive` (nunca pergunta nada) |
+| `history reset` | apaga o `history.json` local, só com confirmação (`[s/N]` em terminal ou `--yes`). O que já foi publicado não é tocado |
 | `restore` | computador novo: baixa o último `metrics.json` publicado no seu repositório de dados e o grava como histórico local (`history.json`). É rede: pede confirmação (`[s/N]` ou `--yes`). `restore --from-file <json>` faz o mesmo 100% offline |
 
-`export` aceita `--no-history` (não mescla com o histórico só nesta execução). Veja "Histórico e computador novo".
+`publish` e `run` aceitam `--accept-history-loss` (sem terminal: aceita publicar um JSON menor que o histórico). `export` aceita `--no-history` (não mescla com o histórico só nesta execução). Veja "Histórico e computador novo".
 
 Opções gerais: `--state-dir <pasta>`, `--config <arquivo>`, `--since <30d|AAAA-MM-DD>`, `--tool <id>` (repetível) e `--top <n>`. Rode `--help` para a lista completa.
 
@@ -228,6 +229,10 @@ Sem histórico, cada `export` usaria só os registros que existem agora, e o pai
 - **O que é preservado:** a série diária (sessões, mensagens, tokens por dia e por ferramenta), os totais, o período, os dias ativos e os dados por ferramenta, recalculados a partir da série mesclada.
 - **O que NÃO é preservado:** o **ranking de projetos** (`projects` e `totals.projects`) vem só dos registros locais. Os nomes anonimizados `projeto-privado-N` não têm identidade estável entre execuções, então não dá para restaurá-los. Os totais de tokens por tipo (entrada/saída/cache) dos dias restaurados são aproximados (a série guarda só o total por dia), e `sessions` pode ser um pouco superestimado para sessões de vários dias que só existem no histórico.
 - **Como o máximo funciona:** se um dia existe nos dois lados, vale o **maior** valor de cada campo. As contagens de um dia só crescem e os registros locais podem ter sido apagados em parte, então o menor valor é o que perdeu dados; somar contaria o mesmo dia duas vezes. Reaplicar a mescla não infla nada (exportar duas vezes dá o mesmo JSON, exceto `generatedAt`).
+- **O `history.json` nunca encolhe:** depois de cada envio ele recebe a **mescla por máximo** do anterior com o JSON publicado, não uma cópia. Um `export --no-history`, `--since`, `--tool` ou `"history": false` não apaga o histórico local. Para zerar de propósito: `history reset`.
+- **Guarda de regressão no `publish`:** se o JSON a publicar tem menos dias ou totais menores (sessões, mensagens, tokens) que o histórico local ou que o `metrics.json` já publicado, o dry-run mostra um aviso em destaque (antes -> depois, quantos dias seriam removidos, e a causa provável: `--no-history`, `--since`, `--tool` ou `history:false`). Em terminal, o envio exige que você digite exatamente `publicar com perda de histórico`; sem terminal, exige `--accept-history-loss`; o envio automático (`run` agendado) é **bloqueado** e nunca aceita a perda. A mesma checagem roda de novo, no envio, contra o que o repositório de dados tem de verdade (por exemplo, outro computador que publicou mais).
+- **Dois computadores:** o baseline é a mescla por máximo do `history.json` e do `metrics.json` do clone local (se um for inválido, usa o outro com aviso). Um baseline com totais incoerentes com a própria série (por exemplo `totals.sessions` gigante) é ignorado com aviso.
+- **`restore` não sobrescreve:** se já existe `history.json`, o restaurado é mesclado pelo máximo e a comparação (dias e totais) é mostrada antes de gravar. `restore --from-file` recusa caminhos de rede (UNC) no Windows, para continuar 100% offline.
 - **Avisos:** o `export` e o dry-run do `publish` dizem quantos dias vieram só do histórico, quantos são só locais e quantos foram elevados, e avisam em destaque quando os registros locais têm muito menos dias que o histórico.
 - Nada disso publica mais do que já era público (a série diária). Detalhes do algoritmo: [`docs/historico.md`](docs/historico.md).
 
