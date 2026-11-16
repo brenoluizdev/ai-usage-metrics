@@ -287,6 +287,19 @@ test("render: gera o SVG a partir do JSON validado e recusa JSON inválido", asy
 /** Remove só comentários que ocupam a linha inteira (`//...` e blocos que começam no início da linha): nada de código escondido atrás de `//` dentro de string/regex. */
 const semComentariosDeLinha = (src) => src.replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, "").replace(/^[ \t]*\/\/.*$/gm, "");
 const REDE = "https?|http2|net|dns|tls|dgram|child_process";
+// Módulos que nenhum arquivo de src/ pode importar (https só em ambiente.mjs e child_process só em publish.mjs/ambiente.mjs, tratados à parte).
+const PROIBIDOS = /^(http|http2|net|dns|tls|dgram|worker_threads|vm|cluster|inspector|module|repl|v8|wasi|trace_events|diagnostics_channel)$/;
+// Construções que executam código dinâmico ou abrem rede por outro caminho.
+const PERIGOSOS = [
+  [/(?<![\w.$"'-])eval\s*\(/, "eval"],
+  [/\bnew\s+Function\b|(?<![\w.$"'-])Function\s*\(/, "Function()"],
+  [/\bprocess\s*\.\s*binding\b/, "process.binding"],
+  [/\bcreateRequire\b/, "createRequire"],
+  [/(?<![\w.$"'-])fetch\s*(?:\(|`)|\b(?:globalThis|global|self|window)\s*(?:\.|\[\s*["'])\s*fetch\b|=\s*fetch\b(?![\w:-])/, "fetch"],
+  [/\bimport\s*\(\s*(?!["'`])/, "import() com argumento que não é literal"],
+  [/XMLHttpRequest|WebSocket/, "XMLHttpRequest/WebSocket"],
+];
+const construcoesPerigosas = (src) => PERIGOSOS.filter(([re]) => re.test(src)).map(([, nome]) => nome);
 /** Módulos importados (com ou sem o prefixo `node:`; import estático/dinâmico, require, side-effect import). */
 function modulosImportados(src) {
   const achados = [];
@@ -307,7 +320,21 @@ test("varredura de imports: pega https/http/net/child_process com e sem 'node:' 
   assert.ok(modulosImportados(semComentariosDeLinha('const u = "http://x"; import "https"; // fim')).includes("https"));
 });
 
-test("segurança do código: rede só em ambiente.mjs (https), child_process só em publish.mjs e ambiente.mjs, sem --force, sem refspec forçado", async () => {
+test("varredura de construções perigosas: módulos de execução (vm, worker_threads...), eval, new Function, process.binding, fetch e import() dinâmico", () => {
+  for (const m of ["worker_threads", "vm", "cluster", "inspector", "module", "node:vm"]) assert.match(modulosImportados(`import x from "${m}";`)[0], PROIBIDOS, m);
+  const ruins = [
+    ["eval(codigo)", "eval"], ["const r = eval ('1')", "eval"], ["new Function('return 1')", "Function()"], ["const f = Function('x')", "Function()"],
+    ["process.binding('fs')", "process.binding"], ["import { createRequire } from 'x'", "createRequire"],
+    ["await fetch(url)", "fetch"], ["await fetch (url)", "fetch"], ["fetch`x`", "fetch"], ["const f = fetch;", "fetch"], ["globalThis.fetch(u)", "fetch"], ["globalThis['fetch'](u)", "fetch"],
+    ["await import(nome)", "import() com argumento que não é literal"], ["import(`./${x}.mjs`.toString())".replace("`./", "x + `./"), "import() com argumento que não é literal"],
+    ["new WebSocket(u)", "XMLHttpRequest/WebSocket"],
+  ];
+  for (const [codigo, esperado] of ruins) assert.ok(construcoesPerigosas(codigo).includes(esperado), `${codigo} -> ${esperado}`);
+  // permitido: import() literal (cli.mjs carrega "./setup.mjs"), "fetch" como argumento do git, palavras parecidas
+  for (const ok of ['await import("./setup.mjs");', 'git(["fetch", "--quiet"])', "const evaluate = 1; avaliar();", "obj.eval(1)", "// fetch(url)"]) assert.deepEqual(construcoesPerigosas(semComentariosDeLinha(ok)), [], ok);
+});
+
+test("segurança do código: rede só em ambiente.mjs (https), child_process só em publish.mjs e ambiente.mjs, sem execução dinâmica, sem --force, sem refspec forçado", async () => {
   const { readdir } = await import("node:fs/promises");
   const raiz = new URL("../src/", import.meta.url);
   const arquivos = [];
@@ -334,9 +361,9 @@ test("segurança do código: rede só em ambiente.mjs (https), child_process só
         assert.ok(["publish.mjs", "ambiente.mjs"].includes(nome), `${nome} não pode usar child_process`);
         continue;
       }
-      assert.doesNotMatch(m, /^(http|http2|net|dns|tls|dgram)$/, `${nome} importa ${m}`);
+      assert.doesNotMatch(m, PROIBIDOS, `${nome} importa ${m}`);
     }
-    assert.doesNotMatch(src, /\bfetch\(|XMLHttpRequest|WebSocket/, nome);
+    assert.deepEqual(construcoesPerigosas(src), [], `${nome} usa construção proibida`);
     assert.doesNotMatch(src, /--force|--force-with-lease|"-f"|"\+refs/, nome);
   }
   // Única exceção de rede própria: o assistente `setup` (src/ambiente.mjs), uma consulta HTTPS GET ao host fixo api.github.com.
