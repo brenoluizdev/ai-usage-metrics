@@ -299,7 +299,16 @@ test("segurança do código: sem rede própria, sem --force, sem refspec forçad
   assert.ok(arquivos.length > 5);
   for (const u of arquivos) {
     const src = (await readFile(u, "utf8")).replace(/(?<!:)\/\/.*$/gm, ""); // sem comentários
-    assert.doesNotMatch(src, /node:(http|https|http2|net|dns|tls|dgram)/, u.pathname);
+    // Única exceção de rede própria: o assistente `setup` faz UMA consulta HTTPS GET ao host fixo api.github.com (src/ambiente.mjs, documentada no SECURITY.md).
+    const ehAmbiente = u.pathname.endsWith("/src/ambiente.mjs");
+    assert.doesNotMatch(src, ehAmbiente ? /node:(http(?!s)|http2|net|dns|tls|dgram)/ : /node:(http|https|http2|net|dns|tls|dgram)/, u.pathname);
+    if (ehAmbiente) {
+      assert.equal((src.match(/node:https/g) ?? []).length, 1);
+      assert.match(src, /host: HOST_API/);
+      assert.match(src, /HOST_API = "api.github.com"/);
+      assert.match(src, /method: "GET"/);
+      assert.doesNotMatch(src, /method: "(?!GET)/);
+    }
     assert.doesNotMatch(src, /\bfetch\(|XMLHttpRequest|WebSocket/, u.pathname);
     assert.doesNotMatch(src, /--force|--force-with-lease|"-f"|"\+refs/, u.pathname);
   }
