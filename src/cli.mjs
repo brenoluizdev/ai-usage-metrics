@@ -8,15 +8,16 @@ import { ADAPTERS } from "./adapters/index.mjs";
 import { aggregate } from "./aggregate.mjs";
 import { PADROES, autorDoCommit, caminhos, gravarConfig, gravarEstado, lerConfig, lerEstado, normalizarConfig, normalizarRemoto, pastaPadrao, urlDoRemoto, validarStateDir } from "./config.mjs";
 import { adquirirLock } from "./lock.mjs";
-import { garantirSvgSemVazamento, lerAllowlist, validarTitulo } from "./privacy.mjs";
-import { descreverPlano, enviar, planejar } from "./publish.mjs";
+import { ARQUIVO_HISTORICO, carregarBaseline, gravarBaseline, lerArquivoLimitado, linhasDoHistorico, mesclarHistorico, normalizarResumoGravado, validarTextoDeBaseline } from "./historico.mjs";
+import { garantirSemVazamento, garantirSvgSemVazamento, lerAllowlist, validarTitulo } from "./privacy.mjs";
+import { baixarMetricasPublicadas, descreverPlano, enviar, planejar, semCredenciais } from "./publish.mjs";
 import { toPublic } from "./public.mjs";
 import { renderTerminal } from "./report.mjs";
 import { exigirMetricasValidas } from "./schema.mjs";
 import { IDIOMAS, MODELOS, MODELO_PADRAO, TEMAS, gerarSvg } from "./svg.mjs";
 
-const COMANDOS = ["sources", "report", "export", "render", "publish", "init", "run"];
-const BOOLEANAS = ["help", "yes", "dry-run", "overwrite", "accept-public-email", "non-interactive"];
+const COMANDOS = ["sources", "report", "export", "render", "publish", "init", "run", "restore"];
+const BOOLEANAS = ["help", "yes", "dry-run", "overwrite", "accept-public-email", "non-interactive", "no-history"];
 const BIN = fileURLToPath(new URL("../bin/ai-usage-metrics.mjs", import.meta.url));
 
 const AJUDA = `ai-usage-metrics: mede o uso das suas ferramentas de IA (100% local, só leitura, sem IA no meio).
@@ -33,6 +34,8 @@ Comandos
             só envia com confirmação (--yes ou pergunta interativa)
   init      cria a configuração local e imprime o trecho de README e o agendamento
   run       export -> render -> publish numa etapa (para o agendador)
+  restore   computador novo: baixa o último metrics.json publicado no SEU repositório de dados e o grava como histórico local
+            (history.json); é uma etapa de REDE e pede confirmação (--yes). --from-file <json> faz o mesmo 100% offline
 
 Opções gerais
   --state-dir <pasta>       configuração, estado, clone e saídas (padrão ~/.ai-usage-metrics)
@@ -43,6 +46,8 @@ Opções gerais
   --top <n>                 tamanho do ranking no report (padrão 10)
 
 export:   --out <arquivo>   (padrão <state-dir>/out/metrics.json)
+          --no-history      não mescla a série diária com o último JSON publicado (history.json) só nesta execução
+                            (configuração: "history": false desliga sempre). --since também desliga a mescla.
 render:   --input <json> --theme auto|light|dark --title <texto> --lang en|pt-BR --model model-1|model-2|model-3
           sem --out: grava metrics.svg (o modelo escolhido; padrão: "model" da configuração ou model-1) e também
           metrics.model-1.svg, metrics.model-2.svg e metrics.model-3.svg em <state-dir>/out
@@ -53,7 +58,8 @@ publish:  --input <json> --yes (envia sem perguntar) --dry-run (nunca envia nem 
           --accept-public-email (sem terminal: aceita publicar um e-mail que não é noreply do GitHub)
 init:     --user <usuário GitHub> --repo <nome> --branch <nome> --public a,b --theme --lang --title --remote <url> --overwrite
           --model model-1|model-2|model-3  --colors '{"accent":"#22c55e"}'  --colors-dark '{"background":"#1a1033"}'
-run:      em modo não interativo só envia se autoPublish for true e houver um publish manual confirmado
+restore:  --yes (sem perguntar [s/N]) --from-file <json> (offline; sem rede e sem confirmação)
+run:      aceita as opções do export (--no-history); em modo não interativo só envia se autoPublish for true e houver um publish manual confirmado
           --non-interactive (nunca pergunta nada, mesmo que haja um console: use no agendador; o Agendador do Windows
           dá um console ao processo, e sem esta opção o "run" esperaria a resposta de [s/N] para sempre)
 `;
@@ -150,19 +156,45 @@ async function lerAvisosDoExport(paths) {
   }
 }
 
-async function etapaExport({ adapters, ctx, home, config, destino, paths, out }) {
+async function lerResumoDoHistorico(paths) {
+  try {
+    return normalizarResumoGravado(JSON.parse(await readFile(join(paths.saida, "historico.json"), "utf8")));
+  } catch {
+    return null;
+  }
+}
+
+async function etapaExport({ adapters, ctx, home, config, destino, paths, out, historico = true }) {
   const meta = adapters.map(({ id, name, capabilities }) => ({ id, name, capabilities }));
   const { lista, avisar } = novosAvisos();
   const agg = await aggregate(coletar(adapters, { ...ctx, avisar }), { home, tools: meta, avisar });
   if (!config) out("Aviso: sem configuração; todos os projetos serão anonimizados.");
-  const json = toPublic(agg, { allowlist: lerAllowlist(config ?? {}, { home }), home, avisar });
+  let json = toPublic(agg, { allowlist: lerAllowlist(config ?? {}, { home }), home, avisar });
   exigirMetricasValidas(json); // o que sai do código também passa pela allowlist estrita
+  // Histórico persistente: mescla a série diária com o último JSON publicado (baseline validado estritamente). Falha = ignora.
+  let resumoHist = { usado: false };
+  if (historico) {
+    try {
+      const base = await carregarBaseline({ paths, config, home, avisar });
+      if (base) {
+        const m = mesclarHistorico(json, base.json, { tools: meta, avisar, hoje: new Date() });
+        json = m.json;
+        resumoHist = { usado: true, origem: base.origem, ...m.resumo };
+      }
+    } catch {
+      avisar("histórico ignorado: não consegui mesclar (os números saem só dos registros locais).");
+    }
+    exigirMetricasValidas(json);
+    garantirSemVazamento(JSON.stringify(json), home); // barreira de privacidade sobre o resultado final
+  }
   await gravar(destino, JSON.stringify(json, null, 2) + "\n");
   // Sempre na pasta de saída do estado (nunca ao lado de --out: não sobrescreve arquivo alheio). Só local; o publish repete na tela.
   await gravar(join(paths.saida, "avisos.json"), JSON.stringify([...lista]) + "\n");
+  await gravar(join(paths.saida, "historico.json"), JSON.stringify(resumoHist) + "\n"); // só números: o publish mostra no dry-run
   const publicos = json.projects.filter((p) => p.public).length;
   out(`JSON gravado em ${destino}`);
   out(`${json.projects.length} projetos (${publicos} com nome público, ${json.projects.length - publicos} anonimizados), ${json.totals.sessions} sessões.`);
+  if (resumoHist.usado) for (const l of linhasDoHistorico(resumoHist)) out(l);
   for (const a of lista) out(`Aviso: ${a}`);
   return json;
 }
@@ -217,6 +249,8 @@ function divergenciasDaAprovacao(estado, atual) {
 async function etapaPublish({ config, paths, jsonPath, home, yes, dryRun, aceitaEmail, io, out, modo }) {
   const plano = await planejar({ config, caminhos: paths, jsonPath, home });
   out(descreverPlano(plano));
+  const hist = await lerResumoDoHistorico(paths);
+  if (hist) for (const l of linhasDoHistorico(hist)) out(`(do último export) ${l}`);
   for (const av of await lerAvisosDoExport(paths)) out(`Aviso (do último export): ${av}`);
   const estado = await lerEstado(paths.estado);
   const atual = aprovacaoAtual(config, plano, home);
@@ -269,6 +303,15 @@ async function etapaPublish({ config, paths, jsonPath, home, yes, dryRun, aceita
     out(`Enviado para ${urlDoRemoto(config)}.`);
     novo.lastPublishAt = new Date().toISOString();
   } else out(`Nada enviado: ${r.motivo}.`);
+  // history.json = cópia do metrics.json PUBLICADO com sucesso (ou já publicado, quando nada mudou). Nunca antes do envio dar certo.
+  if ((r.enviado || r.jaPublicado) && config.history !== false) {
+    try {
+      await gravarBaseline(paths, plano.arquivos.find((a) => a.nome === "metrics.json").conteudo, { home });
+      out(`Histórico local atualizado (${ARQUIVO_HISTORICO}).`);
+    } catch (e) {
+      out(`Aviso: não consegui atualizar o histórico local: ${limparAviso(e.message)}`);
+    }
+  }
   if (modo === "manual") {
     if (io.isTTY) {
       // Só uma pessoa num terminal interativo pode aprovar o envio automático (vale também quando nada mudou: serve para reaprovar).
@@ -431,6 +474,47 @@ async function cmdInit({ args, paths, io, out }) {
   out(instrucoesDeAgendamento({ stateDir: args["state-dir"] ? resolve(args["state-dir"]) : null, configPath: args.config ? arquivo : null }));
 }
 
+// ---------- restore: computador novo ----------
+
+async function cmdRestore({ args, config, paths, home, io, out }) {
+  let texto;
+  if (args["from-file"]) {
+    const arquivo = resolve(args["from-file"]);
+    const r = await lerArquivoLimitado(arquivo, { seguirLink: true });
+    if (r === null) throw new Error(`restore --from-file: o arquivo não existe: ${arquivo}`);
+    if (r.motivo) throw new Error(`restore --from-file: ${r.motivo}.`);
+    texto = r.texto;
+  } else {
+    if (!config) throw new Error('Sem configuração. Rode "ai-usage-metrics init --user <usuário-github>" primeiro (ou use restore --from-file <json>).');
+    out(`restore: vai baixar o último metrics.json publicado de ${semCredenciais(urlDoRemoto(config))} (branch ${config.branch}) e gravá-lo como ${ARQUIVO_HISTORICO}. É uma etapa de REDE.`);
+    if (!args.yes) {
+      if (!io.isTTY) {
+        out("Nada feito (sem terminal interativo). Confira o destino acima e rode de novo com --yes.");
+        return;
+      }
+      if (!afirmativa(await io.ask("Baixar agora? [s/N] "))) {
+        out("Cancelado: nada foi baixado.");
+        return;
+      }
+    }
+    const r = await baixarMetricasPublicadas({ config, caminhos: paths, interativo: io.isTTY, avisar: (m) => out(`Aviso: ${m}`) });
+    if (r.vazio) {
+      out(`Nada para restaurar: ${r.motivo}. Nada foi gravado.`);
+      return;
+    }
+    texto = r.texto;
+  }
+  const v = validarTextoDeBaseline(texto, { home });
+  if (!v.ok) throw new Error(`restore recusado: o JSON ${v.motivo}. Nada foi gravado.`);
+  const conhecidas = new Set(ADAPTERS.map((a) => a.id));
+  const fora = [...new Set([...v.json.tools.map((t) => t.id), ...v.json.timeline.points.flatMap((p) => Object.keys(p.byTool))])].filter((id) => !conhecidas.has(id));
+  if (fora.length) out(`Aviso: ferramenta(s) fora do registro desta versão (${fora.join(", ")}) serão ignoradas ao mesclar.`);
+  await gravarBaseline(paths, JSON.stringify(v.json, null, 2) + "\n", { home });
+  const t = v.json.totals;
+  out(`Histórico restaurado em ${paths.historico}: ${v.json.timeline.points.length} dias${v.json.period ? ` (${v.json.period.from} a ${v.json.period.to})` : ""}, ${t.sessions} sessões, ${t.userMessages} mensagens.`);
+  out('Aviso: o ranking de projetos NÃO é restaurado (vem só dos registros locais). Rode "run" (ou "export") para mesclar com este computador.');
+}
+
 // ---------- main ----------
 
 /**
@@ -452,11 +536,11 @@ export async function main(argv, out = console.log, io = ioPadrao()) {
   const configPath = resolve(args.config ?? paths.config);
   const ctx = { home, since: parseSince(args.since) };
 
-  if (["init", "export", "render", "publish", "run"].includes(cmd)) await validarStateDir(args["state-dir"] ?? paths.dir, { homes: [home] }); // a grafia CRUA é validada (resolve() esconderia ponto/espaço final)
+  if (["init", "export", "render", "publish", "run", "restore"].includes(cmd)) await validarStateDir(args["state-dir"] ?? paths.dir, { homes: [home] }); // a grafia CRUA é validada (resolve() esconderia ponto/espaço final)
   if (cmd === "init") return cmdInit({ args, paths, io, out });
 
   // Escritas na pasta de estado não podem rodar em paralelo (lockfile com detecção de trava velha).
-  const liberar = ["export", "render", "publish", "run"].includes(cmd) ? await adquirirLock(paths.dir) : null;
+  const liberar = ["export", "render", "publish", "run", "restore"].includes(cmd) ? await adquirirLock(paths.dir) : null;
   try {
     return await executar({ cmd, args, home, paths, configPath, ctx, io, out });
   } finally {
@@ -506,8 +590,14 @@ async function executar({ cmd, args, home, paths, configPath, ctx, io, out }) {
     return o;
   };
 
+  if (cmd === "restore") return cmdRestore({ args, config, paths, home, io, out });
+
+  // Mescla com o histórico: ligada por padrão; "history": false na configuração, --no-history ou --since a desligam.
+  const historico = config?.history !== false && !args["no-history"] && !ctx.since;
+  if (ctx.since && config?.history !== false && !args["no-history"] && ["export", "run"].includes(cmd)) out("Aviso: --since limita o período, então o histórico não foi mesclado nesta execução.");
+
   if (cmd === "export") {
-    await etapaExport({ adapters, ctx, home, config, destino: resolve(args.out ?? paths.json), paths, out });
+    await etapaExport({ adapters, ctx, home, config, destino: resolve(args.out ?? paths.json), paths, out, historico });
     return;
   }
 
@@ -528,7 +618,7 @@ async function executar({ cmd, args, home, paths, configPath, ctx, io, out }) {
   if (cmd === "run") {
     exigirConfig();
     const o = opcoesSvg();
-    await etapaExport({ adapters, ctx, home, config, destino: paths.json, paths, out });
+    await etapaExport({ adapters, ctx, home, config, destino: paths.json, paths, out, historico });
     await etapaRender({ jsonPath: paths.json, svgPath: paths.svg, dirModelos: paths.saida, opcoes: o, home, out });
     if (io.isTTY) {
       await etapaPublish({ config, paths, jsonPath: paths.json, home, yes: args.yes, dryRun: args["dry-run"], aceitaEmail: args["accept-public-email"], io, out, modo: "manual" });
