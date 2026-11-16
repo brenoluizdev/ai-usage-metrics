@@ -67,7 +67,30 @@ Nos exemplos abaixo, `ai-usage-metrics` é o comando instalado. Com `npx`, escre
 
 ## Início rápido
 
-1. Crie, no GitHub, um repositório **público e vazio** chamado `seu-usuario/ai-metrics`. A ferramenta não cria nada no GitHub.
+A forma recomendada é o assistente interativo (precisa de um terminal):
+
+```bash
+npx ai-usage-metrics setup
+```
+
+Ele pergunta, passo a passo, o que precisa e leva você do zero até o primeiro painel publicado e o agendamento diário. Veja a próxima seção. O `init` por flags (abaixo) continua existindo para automação e uso avançado.
+
+## Assistente de configuração (`setup`)
+
+`ai-usage-metrics setup` substitui os passos manuais do `init`: cria o repositório de dados (se você quiser e tiver o `gh`), grava o e-mail noreply com ID, escolhe projetos públicos, modelo e cores com prévia dos seus próprios dados, cria a tarefa agendada e publica pela primeira vez.
+
+- **Só em terminal interativo.** Sem terminal, ou com `--non-interactive`, não faz nada e manda você para o `init`.
+- **Cada ação externa tem a sua confirmação `[s/N]` (padrão N)**, descrevendo o que vai acontecer: consultar o `gh`, consultar a API pública do GitHub, criar o repositório de dados (**público**), `restore` do histórico, instalar uma cópia fixa do pacote com `npm install`, criar a tarefa agendada e publicar. Nada disso acontece sem o seu "s".
+- **O `gh` é opcional.** Toda etapa tem o caminho manual equivalente. A ferramenta nunca lê, pede, guarda nem imprime token.
+- **Nada é gravado antes do resumo final** (exceto as prévias dos SVGs em `<state-dir>/out/preview/`). A configuração é gravada de forma atômica e, ao reconfigurar, a anterior vira `config.json.bak`.
+- **Refazer**: rode `setup` de novo; os valores atuais viram o padrão (Enter mantém) e há a opção "só mudar modelo e cores".
+- **Windows**: se o pacote está no cache do `npx` (o agendamento quebraria quando o cache for limpo), o assistente oferece instalar uma cópia fixa em `~/.ai-usage-metrics-runtime` e agenda a partir dela. Linux/macOS: imprime a linha de `cron` (não validada).
+
+Detalhes do fluxo e das decisões em [`docs/setup.md`](docs/setup.md); modelo de segurança em [`SECURITY.md`](SECURITY.md).
+
+### Alternativa: `init` por flags (automação e uso avançado)
+
+1. Crie, no GitHub, um repositório **público e vazio** chamado `seu-usuario/ai-metrics`. O `init` não cria nada no GitHub.
 2. Gere a configuração local:
    ```bash
    ai-usage-metrics init --user seu-usuario --public meu-site,outro-projeto --lang pt-BR --title "Meu uso de IA"
@@ -165,7 +188,8 @@ Só a última etapa usa a rede (`git clone`, `fetch` e `push` para o remoto que 
 | `export` | gera o JSON agregado e anonimizado (esquema v1, em [`docs/esquema.md`](docs/esquema.md)) |
 | `render` | gera os SVGs a partir do JSON (`--theme auto\|light\|dark`, `--title`, `--lang en\|pt-BR`, `--model model-1\|model-2\|model-3`). Sem `--out`, grava `metrics.svg` e os três `metrics.model-N.svg` em `<state-dir>/out`; com `--out arquivo.svg`, grava só aquele arquivo; com `--out-dir pasta`, o conjunto completo nessa pasta |
 | `publish` | dry-run por padrão; com `--yes` (ou resposta interativa) envia o JSON e os 4 SVGs (5 arquivos) |
-| `init` | cria a configuração local e imprime o trecho de README e o agendamento |
+| `setup` | **assistente interativo (recomendado)**: guia do zero até o primeiro painel publicado e o agendamento. Só em terminal; cada ação externa pede `[s/N]` |
+| `init` | (automação/avançado) cria a configuração local por flags e imprime o trecho de README e o agendamento |
 | `run` | `export`, `render` e `publish` numa etapa, para o agendador. No agendador use `--non-interactive` (nunca pergunta nada) |
 | `restore` | computador novo: baixa o último `metrics.json` publicado no seu repositório de dados e o grava como histórico local (`history.json`). É rede: pede confirmação (`[s/N]` ou `--yes`). `restore --from-file <json>` faz o mesmo 100% offline |
 
@@ -227,7 +251,7 @@ O `publish` foi desenhado para que um envio acidental seja difícil:
 
 ## Agendamento
 
-O `init` imprime as instruções e **não instala nada**. No Windows ele imprime duas versões do `schtasks`, uma para o `cmd.exe` e outra para o PowerShell; use a do terminal onde for colar. No Linux e no macOS, use `cron`. Exemplo (cmd.exe):
+O assistente `setup` cria a tarefa no Windows por você (com a sua confirmação). O `init` imprime as instruções e **não instala nada**. No Windows ele imprime duas versões do `schtasks`, uma para o `cmd.exe` e outra para o PowerShell; use a do terminal onde for colar. No Linux e no macOS, use `cron`. Exemplo (cmd.exe):
 
 ```
 schtasks /Create /SC DAILY /ST 12:00 /TN "ai-usage-metrics" /TR "\"C:\caminho\node.exe\" \"C:\caminho\bin\ai-usage-metrics.mjs\" run --non-interactive"
@@ -262,9 +286,9 @@ O modelo de ameaças, as travas e como reportar uma vulnerabilidade estão em [`
 
 ```
 bin/        ponto de entrada da CLI
-src/        comandos, adaptadores das fontes, agregação, privacidade, publicação e SVG
+src/        comandos, adaptadores das fontes, agregação, privacidade, publicação, SVG e o assistente (setup.mjs, ambiente.mjs)
 test/       testes com fixtures sintéticas e repositório git local como remoto
-docs/       esquema do JSON, fontes de dados, modelos e cores
+docs/       esquema do JSON, fontes de dados, modelos e cores, histórico e o assistente setup
 examples/   JSON e SVGs de exemplo dos 3 modelos (dados fictícios)
 templates/  workflow opcional do GitHub Actions
 ```
