@@ -10,7 +10,9 @@ import { ADAPTERS } from "./adapters/index.mjs";
 import { aposentarClone, cloneEhNosso, gravarMarcadores } from "./clone-owner.mjs";
 import { autorDoCommit, hostDoRemoto, modoTesteRemotoLocal, normalizarRemoto, urlDoRemoto, validarRemoto } from "./config.mjs";
 import { garantirSemVazamento, garantirSvgSemVazamento, lerAllowlist, validarTitulo } from "./privacy.mjs";
-import { exigirMetricasValidas } from "./schema.mjs";
+import { lerArquivoLimitado } from "./limitado.mjs";
+import { avaliarRegressao, linhasDeRegressao } from "./regressao.mjs";
+import { exigirMetricasValidas, validarMetricas } from "./schema.mjs";
 import { MODELOS, MODELO_PADRAO, gerarSvg } from "./svg.mjs";
 
 const execFileP = promisify(execFile);
@@ -194,10 +196,12 @@ export async function planejar({ config, caminhos, jsonPath, home }) {
 
   let anterior = null;
   try {
-    anterior = antigos["metrics.json"] ? JSON.parse(antigos["metrics.json"]) : null;
+    anterior = antigos["metrics.json"] && antigos["metrics.json"].length <= 5 * 1024 * 1024 ? JSON.parse(antigos["metrics.json"]) : null;
   } catch {
     anterior = null;
   }
+  // Só uma referência válida pelo esquema serve de comparação (a guarda de regressão olha a série, não os totais declarados).
+  const anteriorJson = anterior && typeof anterior === "object" && validarMetricas(anterior).ok ? anterior : null;
 
   return {
     json,
@@ -208,7 +212,12 @@ export async function planejar({ config, caminhos, jsonPath, home }) {
     branch: config.branch,
     autor: autorDoCommit(config),
     cloneExiste: existsSync(join(caminhos.clone, ".git")),
-    anterior: anterior && typeof anterior === "object" && anterior.totals ? { sessions: anterior.totals.sessions, userMessages: anterior.totals.userMessages } : null,
+    anteriorJson,
+    anterior: anteriorJson
+      ? { sessions: anteriorJson.totals.sessions, userMessages: anteriorJson.totals.userMessages, dias: anteriorJson.timeline.points.length, from: anteriorJson.period?.from ?? null, to: anteriorJson.period?.to ?? null }
+      : anterior && typeof anterior === "object" && anterior.totals && Number.isSafeInteger(anterior.totals.sessions) && Number.isSafeInteger(anterior.totals.userMessages)
+        ? { sessions: anterior.totals.sessions, userMessages: anterior.totals.userMessages }
+        : null,
   };
 }
 
@@ -231,7 +240,7 @@ export function descreverPlano(plano) {
   }
   const t = plano.json.totals;
   L.push(`Resumo dos números: ${t.sessions} sessões, ${t.userMessages} mensagens, ${t.activeDays} dias ativos, ${t.projects} projetos.`);
-  if (plano.anterior) L.push(`  antes: ${plano.anterior.sessions} sessões, ${plano.anterior.userMessages} mensagens.`);
+  if (plano.anterior) L.push(`  antes: ${plano.anterior.sessions} sessões, ${plano.anterior.userMessages} mensagens${plano.anterior.dias === undefined ? "" : `, ${plano.anterior.dias} dias${plano.anterior.from ? ` (${plano.anterior.from} a ${plano.anterior.to})` : ""}`}.`);
   L.push("Validação: esquema v1 estrito OK; barreira de privacidade OK; SVGs gerados só a partir do JSON validado.");
   L.push(`Privacidade: ${plano.anonimizados} projeto(s) anonimizado(s) (projeto-privado-N).`);
   L.push(plano.publicos.length ? `  Nomes que ficariam PÚBLICOS: ${plano.publicos.join(", ")}.` : "  Nenhum nome de projeto ficaria público.");
@@ -381,10 +390,27 @@ async function sincronizarClone({ config, caminhos, ctx, avisar, criarBranchLoca
  * escrita atômica, autor do commit explícito (padrão: noreply do GitHub).
  * @returns {Promise<{ enviado: boolean, motivo?: string, jaPublicado?: boolean }>}
  */
-export async function enviar(plano, { config, caminhos, interativo, avisar = () => {} }) {
+export async function enviar(plano, { config, caminhos, interativo, avisar = () => {}, permitirPerda = false }) {
   const ctx = await prepararGit({ config, caminhos, interativo });
   const { remoto, g } = ctx;
   const { modos } = await sincronizarClone({ config, caminhos, ctx, avisar, criarBranchLocal: true });
+
+  // Guarda de regressão contra o que o remoto TEM de verdade (acabamos de buscar): se outro computador publicou mais, ou o JSON
+  // a enviar é menor, só segue com consentimento explícito (a frase ou --accept-history-loss, decidido pelo chamador).
+  if (!permitirPerda) {
+    const atual = await lerMetricasLimitado(caminhos.clone);
+    let ref = null;
+    try {
+      ref = atual?.texto ? JSON.parse(atual.texto) : null;
+    } catch {
+      ref = null;
+    }
+    const reg = ref && validarMetricas(ref).ok ? avaliarRegressao(plano.json, ref) : null;
+    if (reg) {
+      for (const l of linhasDeRegressao(reg)) avisar(l);
+      return { enviado: false, bloqueado: true, motivo: "bloqueado pela guarda de regressão: o repositório de dados tem mais histórico que o JSON a enviar. Rode export de novo (sem --no-history/--since/--tool) ou, se for de propósito, confirme a perda de histórico" };
+    }
+  }
 
   for (const a of plano.arquivos) await escreverAtomico(caminhos.clone, a.nome, a.conteudo);
   await g(["add", "--", ...ARQUIVOS]);
@@ -402,20 +428,9 @@ export async function enviar(plano, { config, caminhos, interativo, avisar = () 
   return { enviado: true };
 }
 
-const MAX_BYTES_METRICS = 5 * 1024 * 1024;
-
+/** metrics.json do clone com leitura limitada de verdade (abre e lê no máximo 5 MiB + 1 byte; recusa link simbólico). */
 async function lerMetricasLimitado(clone) {
-  const arquivo = join(clone, "metrics.json");
-  let st;
-  try {
-    st = await lstat(arquivo);
-  } catch (e) {
-    if (e.code === "ENOENT") return null;
-    return { motivo: "ilegível" };
-  }
-  if (st.isSymbolicLink() || !st.isFile()) return { motivo: "metrics.json do clone não é um arquivo comum" };
-  if (st.size > MAX_BYTES_METRICS) return { motivo: "grande demais (mais de 5 MiB)" };
-  return { texto: await readFile(arquivo, "utf8") };
+  return lerArquivoLimitado(join(clone, "metrics.json"));
 }
 
 /**

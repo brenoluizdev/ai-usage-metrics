@@ -1,27 +1,64 @@
 // Histórico persistente (camada A): mescla a SÉRIE DIÁRIA local com o último metrics.json publicado (o "baseline").
 // Algoritmo e aproximações: docs/historico.md. O esquema do JSON (v1) NÃO muda.
-import { lstat, mkdir, readFile, stat } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { TS_MIN } from "./adapters/seguro.mjs";
+import { ADAPTERS } from "./adapters/index.mjs";
+import { LIMITE_PADRAO, lerArquivoLimitado } from "./limitado.mjs";
 import { garantirSemVazamento } from "./privacy.mjs";
-import { escreverAtomico, lerMetricasDoClone } from "./publish.mjs";
+import { MOTIVOS_VALIDOS } from "./regressao.mjs";
+import { escreverAtomico, exigirArquivoSeguro, lerMetricasDoClone } from "./publish.mjs";
 import { MAX_PONTOS, exigirMetricasValidas } from "./schema.mjs";
 
+export { lerArquivoLimitado };
+
 /** Teto do arquivo de baseline (history.json, metrics.json do clone, restore --from-file). */
-export const MAX_BYTES_BASELINE = 5 * 1024 * 1024;
+export const MAX_BYTES_BASELINE = LIMITE_PADRAO;
 export const ARQUIVO_HISTORICO = "history.json";
 
 const TETO_COMPONENTE = 2e14; // mesmo teto por tipo de token do aggregate.mjs: o total nunca passa de 8e14 (< 1e15 do esquema)
+const MAX_NUM = 1e15; // teto de qualquer número do esquema
 const TIPOS = ["input", "output", "cacheRead", "cacheWrite"];
 const DIA = 86_400_000;
 const dataMin = new Date(TS_MIN).toISOString().slice(0, 10);
 
 const dataMax = (hoje) => new Date(hoje.getTime() + DIA).toISOString().slice(0, 10); // mesmo limite do tsValido: agora + 1 dia
 const soma = (...n) => n.reduce((a, b) => a + b, 0);
+const metaRegistro = () => ADAPTERS.map(({ id, name, capabilities }) => ({ id, name, capabilities }));
 
 // ---------- validação do baseline (entrada NÃO confiável) ----------
 
 /**
- * Valida estritamente um baseline: allowlist do esquema v1, esquema 1, não sintético e sem vazamento (caminho, e-mail...).
+ * Coerência interna de um baseline JÁ válido pelo esquema: os totais não podem exceder a soma da própria série (o esquema sozinho
+ * aceitaria `totals.sessions = 1e15` com 3 dias). Série cortada em 4000 pontos: os totais legitimamente passam da soma e só o
+ * período (início <= primeiro ponto, fim = último) é conferido. Devolve o motivo ou null.
+ */
+export function coerenciaBaseline(j) {
+  const pts = j.timeline.points;
+  const cortada = pts.length >= MAX_PONTOS;
+  const S = (f) => pts.reduce((a, p) => a + f(p), 0);
+  const inco = (m) => `INCOERENTE (possível adulteração): ${m}`;
+  if (!cortada) {
+    const t = j.totals;
+    if (t.userMessages > S((p) => p.userMessages)) return inco("totals.userMessages maior que a soma da série");
+    if (t.assistantMessages > S((p) => p.assistantMessages)) return inco("totals.assistantMessages maior que a soma da série");
+    if (t.tokens.total > S((p) => p.tokens)) return inco("totals.tokens.total maior que a soma da série");
+    if (t.sessions > S((p) => p.sessions)) return inco("totals.sessions maior que a soma das sessões da série");
+    if (t.activeDays > pts.length) return inco("totals.activeDays maior que o número de dias da série");
+    for (const f of j.tools) {
+      const so = (k) => pts.reduce((a, p) => a + (p.byTool[f.id]?.[k] ?? 0), 0);
+      if (f.sessions > so("sessions") || f.userMessages > so("userMessages") || f.tokens.total > so("tokens")) return inco("uma ferramenta tem totais maiores que a sua própria série");
+    }
+  }
+  if (!pts.length) return j.period === null ? null : inco("período informado, mas a série está vazia");
+  const datas = pts.map((p) => p.date).sort();
+  if (!j.period) return inco("série com dias, mas sem período");
+  if (j.period.to !== datas.at(-1)) return inco("período não bate com a última data da série");
+  if (cortada ? j.period.from > datas[0] : j.period.from !== datas[0]) return inco("período não bate com a primeira data da série");
+  return null;
+}
+
+/**
+ * Valida estritamente um baseline: allowlist do esquema v1, esquema 1, não sintético, coerente e sem vazamento (caminho, e-mail...).
  * @returns {{ ok: true, json: any } | { ok: false, motivo: string }}
  */
 export function validarBaseline(json, { home } = {}) {
@@ -31,6 +68,8 @@ export function validarBaseline(json, { home } = {}) {
     return { ok: false, motivo: `fora do esquema v1 (${String(e.message).split("\n")[1]?.trim() ?? "inválido"})` };
   }
   if (json.synthetic) return { ok: false, motivo: "é um JSON sintético (de exemplo)" };
+  const inco = coerenciaBaseline(json);
+  if (inco) return { ok: false, motivo: inco };
   try {
     garantirSemVazamento(JSON.stringify(json), home ?? "/nao-usado");
   } catch {
@@ -39,7 +78,7 @@ export function validarBaseline(json, { home } = {}) {
   return { ok: true, json };
 }
 
-/** Valida o TEXTO de um baseline (tamanho, JSON, esquema). Mensagens de motivo nunca repetem o conteúdo. */
+/** Valida o TEXTO de um baseline (tamanho, JSON, esquema, coerência). Mensagens de motivo nunca repetem o conteúdo. */
 export function validarTextoDeBaseline(texto, opts) {
   if (Buffer.byteLength(texto) > MAX_BYTES_BASELINE) return { ok: false, motivo: "grande demais (mais de 5 MiB)" };
   let json;
@@ -51,33 +90,25 @@ export function validarTextoDeBaseline(texto, opts) {
   return validarBaseline(json, opts);
 }
 
-/** Lê um arquivo comum com teto de tamanho, sem seguir link simbólico. Devolve { texto } | { motivo } | null (não existe). */
-export async function lerArquivoLimitado(arquivo, { seguirLink = false } = {}) {
-  let st;
-  try {
-    st = await lstat(arquivo);
-  } catch (e) {
-    if (e.code === "ENOENT") return null;
-    return { motivo: "ilegível" };
-  }
-  if (st.isSymbolicLink() && !seguirLink) return { motivo: "é um link simbólico" };
-  if (!st.isFile() && !st.isSymbolicLink()) return { motivo: "não é um arquivo comum" };
-  if (st.isSymbolicLink()) {
-    st = await stat(arquivo).catch(() => null);
-    if (!st || !st.isFile()) return { motivo: "não é um arquivo comum" };
-  }
-  if (st.size > MAX_BYTES_BASELINE) return { motivo: "grande demais (mais de 5 MiB)" };
-  try {
-    return { texto: await readFile(arquivo, "utf8") };
-  } catch {
-    return { motivo: "ilegível" };
-  }
+/** Recusa caminho de rede no Windows (UNC, \\?\, \\.\, //host/...): preserva o "100% offline" do restore --from-file. */
+export function motivoCaminhoDeRede(caminho, plataforma = process.platform) {
+  const s = String(caminho);
+  if (/^[\\/]{2}[?.][\\/]/.test(s)) return "prefixo de caminho estendido/dispositivo (\\\\?\\, //?/ ou \\\\.\\)";
+  if (plataforma === "win32" && /^[\\/]{2}/.test(s)) return "caminho de rede/UNC (\\\\servidor\\pasta ou //servidor/pasta)";
+  return null;
+}
+
+/** Mescla DOIS baselines válidos pelo máximo (usado para history.json + clone, restore e para manter o history.json monotônico). */
+export function mesclarBaselines(a, b, { avisar, hoje } = {}) {
+  const [novo, velho] = a.generatedAt >= b.generatedAt ? [a, b] : [b, a];
+  return mesclarHistorico(novo, velho, { tools: metaRegistro(), avisar, hoje });
 }
 
 /**
- * Procura o baseline: (a) <state-dir>/history.json; (b) metrics.json do clone local, se o clone for nosso (mesmas checagens do publish).
- * Inválido/adulterado: ignora e avisa ("histórico ignorado: ..."), sem derrubar nada.
- * @returns {Promise<{ json: any, origem: "history.json"|"clone local" } | null>}
+ * Procura o baseline: history.json e metrics.json do clone local (só se o clone for nosso: mesmas checagens do publish), os DOIS
+ * validados; se ambos servem, o baseline é a MESCLA POR MÁXIMO dos dois (history.json fica velho quando outro computador publica);
+ * se um é inválido, usa o outro com aviso. Inválido/incoerente/adulterado: ignora e avisa ("histórico ignorado: ..."), sem derrubar nada.
+ * @returns {Promise<{ json: any, origem: string } | null>}
  */
 export async function carregarBaseline({ paths, config, home, avisar }) {
   const tenta = (origem, r) => {
@@ -91,26 +122,64 @@ export async function carregarBaseline({ paths, config, home, avisar }) {
       avisar?.(`histórico ignorado: ${origem}: ${v.motivo}.`);
       return null;
     }
-    return { json: v.json, origem };
+    return v.json;
   };
-  const a = tenta(ARQUIVO_HISTORICO, await lerArquivoLimitado(paths.historico));
-  if (a) return a;
-  if (!config) return null;
-  let doClone;
-  try {
-    doClone = await lerMetricasDoClone({ config, caminhos: paths });
-  } catch {
-    doClone = { motivo: "não consegui conferir o clone" };
+  const h = tenta(ARQUIVO_HISTORICO, await lerArquivoLimitado(paths.historico));
+  let c = null;
+  if (config) {
+    let doClone;
+    try {
+      doClone = await lerMetricasDoClone({ config, caminhos: paths });
+    } catch {
+      doClone = { motivo: "não consegui conferir o clone" };
+    }
+    c = tenta("clone local", doClone);
   }
-  return tenta("clone local", doClone);
+  if (h && c) {
+    try {
+      return { json: mesclarBaselines(h, c, { avisar }).json, origem: "history.json + clone local" };
+    } catch {
+      avisar?.("histórico: não consegui mesclar history.json com o clone local; usando só o history.json.");
+      return { json: h, origem: ARQUIVO_HISTORICO };
+    }
+  }
+  if (h) return { json: h, origem: ARQUIVO_HISTORICO };
+  if (c) return { json: c, origem: "clone local" };
+  return null;
 }
 
-/** Grava history.json: cópia validada do metrics.json publicado. Atômico, 0600 e recusa link simbólico no destino. */
+/** Grava history.json (texto já em JSON). Atômico, 0600 e recusa link simbólico no destino. Valida de novo antes de gravar. */
 export async function gravarBaseline(paths, texto, { home } = {}) {
   const v = validarTextoDeBaseline(texto, { home });
   if (!v.ok) throw new Error(`não gravei o histórico: ${v.motivo}.`);
   await mkdir(paths.dir, { recursive: true, mode: 0o700 });
   await escreverAtomico(paths.dir, ARQUIVO_HISTORICO, texto, { mode: 0o600 });
+}
+
+/**
+ * Grava o history.json depois de um envio: a MESCLA POR MÁXIMO entre o history.json anterior e o JSON publicado, nunca uma cópia
+ * do publicado. Assim ele nunca encolhe (um export com --no-history/--since/--tool não apaga o histórico). Zerar é um ato explícito:
+ * `history reset`.
+ */
+export async function gravarHistoricoMonotonico(paths, textoPublicado, { home, avisar } = {}) {
+  const novo = validarTextoDeBaseline(textoPublicado, { home });
+  if (!novo.ok) throw new Error(`não gravei o histórico: ${novo.motivo}.`);
+  let final = novo.json;
+  const prev = await lerArquivoLimitado(paths.historico);
+  if (prev && !prev.motivo) {
+    const v = validarTextoDeBaseline(prev.texto, { home });
+    if (v.ok) final = mesclarBaselines(novo.json, v.json, { avisar }).json;
+    else avisar?.(`histórico anterior ignorado ao atualizar o history.json: ${v.motivo}.`);
+  }
+  await gravarBaseline(paths, JSON.stringify(final, null, 2) + "\n", { home });
+}
+
+/** `history reset`: apaga o history.json (nunca segue link simbólico). Devolve true se existia. */
+export async function apagarHistorico(paths) {
+  await exigirArquivoSeguro(paths.historico);
+  const existe = (await lerArquivoLimitado(paths.historico)) !== null;
+  if (existe) await rm(paths.historico);
+  return existe;
 }
 
 // ---------- mescla (função pura) ----------
@@ -133,10 +202,10 @@ export function maxPonto(a, b) {
   const vals = Object.values(byTool);
   return {
     date: a.date,
-    sessions: Math.max(a.sessions, b.sessions, soma(...vals.map((v) => v.sessions))),
-    userMessages: Math.max(a.userMessages, b.userMessages, soma(...vals.map((v) => v.userMessages))),
+    sessions: Math.min(MAX_NUM, Math.max(a.sessions, b.sessions, soma(...vals.map((v) => v.sessions)))),
+    userMessages: Math.min(MAX_NUM, Math.max(a.userMessages, b.userMessages, soma(...vals.map((v) => v.userMessages)))),
     assistantMessages: Math.max(a.assistantMessages, b.assistantMessages),
-    tokens: Math.max(a.tokens, b.tokens, soma(...vals.map((v) => v.tokens))),
+    tokens: Math.min(MAX_NUM, Math.max(a.tokens, b.tokens, soma(...vals.map((v) => v.tokens)))),
     byTool,
   };
 }
@@ -196,9 +265,9 @@ function distribuir(e, pesos) {
  *    documentada: dias restaurados mantêm a proporção que o baseline tinha; dias novos usam a do local. Reaplicar é estável,
  *    porque no 2º passo o baseline já contém tudo e o excedente é 0.
  */
-function combinarTokens(local, somaLocal, base, somaBase, somaMesclada) {
+function combinarTokens(local, somaLocal, base, somaMesclada) {
   if (somaMesclada === somaLocal) return { ...local };
-  const extra = Math.max(0, somaMesclada - somaBase);
+  const extra = Math.max(0, somaMesclada - base.total); // totais SÓ da série: o total final é a soma da série (limitado pelos tetos)
   const pesos = local.total > 0 ? local : base;
   const d = distribuir(extra, pesos);
   const r = {};
@@ -211,6 +280,11 @@ function combinarTokens(local, somaLocal, base, somaBase, somaMesclada) {
 function combinarContagem(local, somaLocal, base, somaBase, somaMesclada) {
   if (somaMesclada === somaLocal) return local;
   return Math.max(base + Math.max(0, somaMesclada - somaBase), local, base);
+}
+
+/** Contagem que é exatamente a soma diária (mensagens): local se a mescla nada acrescentou; senão a soma da série mesclada (estável ao reaplicar). */
+function combinarSoma(local, somaLocal, somaMesclada) {
+  return somaMesclada === somaLocal ? local : Math.max(somaMesclada, local);
 }
 
 const somar = (pontos, f) => soma(0, ...pontos.map(f));
@@ -294,6 +368,8 @@ export function mesclarHistorico(local, baseline, opts) {
   const ferrBase = baseline.tools.filter((t) => ids.has(t.id));
   const semDescarte = ferrBase.length === baseline.tools.length && desconhecidas.size === 0;
   const bt = baseline.totals;
+  // Só a SÉRIE é confiada para contagens (um baseline pode declarar totais que o esquema aceita mas a série não sustenta): o total
+  // declarado entra apenas como teto de sessions (distintas) e como detalhamento de tokens.
   const tb = semDescarte ? { sessions: bt.sessions, user: bt.userMessages, asst: bt.assistantMessages, tokens: { ...bt.tokens } } : {
     sessions: somar(ferrBase, (t) => t.sessions),
     user: somar(ferrBase, (t) => t.userMessages),
@@ -305,14 +381,25 @@ export function mesclarHistorico(local, baseline, opts) {
     }, zeroTokens()),
   };
   const lt = local.totals;
+  let limitou = false;
+  const lim = (n) => {
+    if (n > MAX_NUM) {
+      limitou = true;
+      return MAX_NUM;
+    }
+    return n;
+  };
+  const tokensMescla = combinarTokens(lt.tokens, sl.tokens, tb.tokens, sm.tokens);
+  if (tokensMescla.total < sm.tokens && sm.tokens !== sl.tokens) limitou = true;
   const totals = {
     projects: lt.projects,
-    sessions: combinarContagem(lt.sessions, sl.sessions, tb.sessions, sb.sessions, sm.sessions),
-    userMessages: combinarContagem(lt.userMessages, sl.user, tb.user, sb.user, sm.user),
-    assistantMessages: combinarContagem(lt.assistantMessages, sl.asst, tb.asst, sb.asst, sm.asst),
-    activeDays: Math.max(diasAntesDoCorte, lt.activeDays),
-    tokens: combinarTokens(lt.tokens, sl.tokens, tb.tokens, sb.tokens, sm.tokens),
+    sessions: lim(combinarContagem(lt.sessions, sl.sessions, Math.min(tb.sessions, sb.sessions), sb.sessions, sm.sessions)),
+    userMessages: lim(combinarSoma(lt.userMessages, sl.user, sm.user)),
+    assistantMessages: lim(combinarSoma(lt.assistantMessages, sl.asst, sm.asst)),
+    activeDays: points.length, // sobre os pontos já cortados (estável na borda de 4000 dias)
+    tokens: tokensMescla,
   };
+  void diasAntesDoCorte;
 
   // 5) ferramentas
   const idsFerr = new Set([...local.tools.map((t) => t.id), ...ferrBase.map((t) => t.id)]);
@@ -331,7 +418,7 @@ export function mesclarHistorico(local, baseline, opts) {
     const Ls = L?.sessions ?? 0;
     const Lu = L?.userMessages ?? 0;
     const La = L?.assistantMessages ?? 0;
-    const Bu = B?.userMessages ?? 0;
+    const Bu = Math.min(B?.userMessages ?? 0, b.user);
     const Ba = B?.assistantMessages ?? 0;
     const igualAoLocal = m.sessions === l.sessions && m.user === l.user && m.tokens === l.tokens;
     let asst = La;
@@ -339,20 +426,22 @@ export function mesclarHistorico(local, baseline, opts) {
       const razao = Bu > 0 ? Ba / Bu : Lu > 0 ? La / Lu : 0;
       asst = Math.max(Ba + Math.round(Math.max(0, m.user - b.user) * razao), La, Ba);
     }
-    const sessions = combinarContagem(Ls, l.sessions, B?.sessions ?? 0, b.sessions, m.sessions);
+    asst = Math.min(asst, sm.asst); // nunca mais que todas as respostas da série
+    const sessions = lim(combinarContagem(Ls, l.sessions, Math.min(B?.sessions ?? 0, b.sessions), b.sessions, m.sessions));
     if (sessions <= 0) continue; // como o export atual: só ferramentas com sessões
     const datasDaFerr = points.filter((p) => p.byTool[id]).map((p) => p.date);
-    const primeiros = [datasDaFerr[0], L?.firstActivity, B?.firstActivity].filter((d) => d && dataOk(d)).sort();
-    const ultimos = [datasDaFerr.at(-1), L?.lastActivity, B?.lastActivity].filter((d) => d && dataOk(d)).sort();
+    const cortada = points.length >= MAX_PONTOS; // só com a série cortada as datas declaradas pela ferramenta ajudam
+    const primeiros = [datasDaFerr[0], ...(cortada ? [L?.firstActivity, B?.firstActivity] : [])].filter((d) => d && dataOk(d)).sort();
+    const ultimos = [datasDaFerr.at(-1), ...(cortada ? [L?.lastActivity, B?.lastActivity] : [])].filter((d) => d && dataOk(d)).sort();
     const reg = meta.get(id);
     tools.push({
       id,
       name: reg.name,
       provides: { messages: !!reg.capabilities?.messages, tokens: !!reg.capabilities?.tokens },
       sessions,
-      userMessages: combinarContagem(Lu, l.user, Bu, b.user, m.user),
+      userMessages: lim(combinarSoma(Lu, l.user, m.user)),
       assistantMessages: asst,
-      tokens: combinarTokens(L?.tokens ?? zeroTokens(), l.tokens, B?.tokens ?? zeroTokens(), b.tokens, m.tokens),
+      tokens: combinarTokens(L?.tokens ?? zeroTokens(), l.tokens, B?.tokens ?? zeroTokens(), m.tokens),
       firstActivity: primeiros[0] ?? null,
       lastActivity: ultimos.at(-1) ?? null,
     });
@@ -360,8 +449,10 @@ export function mesclarHistorico(local, baseline, opts) {
   tools.sort((a, b) => b.sessions - a.sessions || a.id.localeCompare(b.id));
 
   // 6) período: da série, do período local e do período do baseline (só se as datas forem plausíveis)
-  const extremos = [...points.map((p) => p.date), local.period?.from, local.period?.to, baseline.period?.from, baseline.period?.to].filter((d) => d && dataOk(d)).sort();
-  const period = extremos.length ? { from: extremos[0], to: extremos.at(-1) } : null;
+  // Série inteira: o período É o intervalo dos pontos. Série cortada em 4000: o início pode vir do período local/do baseline.
+  const extremos = [...points.map((p) => p.date), ...(points.length >= MAX_PONTOS ? [local.period?.from, baseline.period?.from] : [])].filter((d) => d && dataOk(d)).sort();
+  const period = points.length ? { from: extremos[0], to: points.at(-1).date } : null;
+  if (limitou) avisar("histórico: algum total passou do limite do esquema (1e15) e foi limitado.");
 
   const json = { ...local, period, totals, tools, timeline: { ...local.timeline, points } };
   exigirMetricasValidas(json);
@@ -399,7 +490,7 @@ const num = (v) => (Number.isSafeInteger(v) && v >= 0 && v <= 1e7 ? v : 0);
 export function normalizarResumoGravado(bruto) {
   if (!bruto || typeof bruto !== "object" || bruto.usado !== true) return null;
   return {
-    origem: bruto.origem === "clone local" ? "clone local" : "history.json",
+    origem: ["clone local", "history.json + clone local"].includes(bruto.origem) ? bruto.origem : "history.json",
     diasLocais: num(bruto.diasLocais),
     diasBaseline: num(bruto.diasBaseline),
     diasDoHistorico: num(bruto.diasDoHistorico),
@@ -409,3 +500,8 @@ export function normalizarResumoGravado(bruto) {
   };
 }
 
+
+/** Motivos (rótulos fixos) pelos quais o export ficou sem o histórico/limitado; lidos do out/historico.json (arquivo local, não confiável). */
+export function normalizarMotivos(bruto) {
+  return Array.isArray(bruto?.motivos) ? bruto.motivos.filter((m) => MOTIVOS_VALIDOS.includes(m)) : [];
+}
