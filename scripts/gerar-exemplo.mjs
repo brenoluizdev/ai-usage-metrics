@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { aggregate } from "../src/aggregate.mjs";
 import { toPublic } from "../src/public.mjs";
 import { exigirMetricasValidas } from "../src/schema.mjs";
-import { gerarSvg } from "../src/svg.mjs";
+import { MODELOS, gerarSvg } from "../src/svg.mjs";
 
 const HOME = "/home/exemplo";
 let semente = 20260101;
@@ -72,6 +72,8 @@ const pasta = resolve(dirname(fileURLToPath(import.meta.url)), "..", "examples")
 await mkdir(pasta, { recursive: true });
 await writeFile(resolve(pasta, "metrics.example.json"), JSON.stringify(json, null, 2) + "\n", "utf8");
 for (const tema of ["light", "dark"]) {
+  // metrics.example.<tema>.svg = model-1 (como sempre); metrics.example.model-N.<tema>.svg = cada modelo (cores padrão)
   await writeFile(resolve(pasta, `metrics.example.${tema}.svg`), gerarSvg(json, { tema, titulo: "AI usage" }), "utf8");
+  for (const modelo of MODELOS) await writeFile(resolve(pasta, `metrics.example.${modelo}.${tema}.svg`), gerarSvg(json, { tema, titulo: "AI usage", modelo }), "utf8");
 }
 console.log(`Exemplo sintético gravado em ${pasta}`);
