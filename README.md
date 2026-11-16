@@ -112,7 +112,7 @@ Só a última etapa usa a rede (`git clone`, `fetch` e `push` para o remoto que 
 | `render` | gera o SVG a partir do JSON (`--theme auto\|light\|dark`, `--title`, `--lang en\|pt-BR`) |
 | `publish` | dry-run por padrão; com `--yes` (ou resposta interativa) envia o JSON e o SVG |
 | `init` | cria a configuração local e imprime o trecho de README e o agendamento |
-| `run` | `export`, `render` e `publish` numa etapa, para o agendador |
+| `run` | `export`, `render` e `publish` numa etapa, para o agendador. No agendador use `--non-interactive` (nunca pergunta nada) |
 
 Opções gerais: `--state-dir <pasta>`, `--config <arquivo>`, `--since <30d|AAAA-MM-DD>`, `--tool <id>` (repetível) e `--top <n>`. Rode `--help` para a lista completa.
 
@@ -152,11 +152,12 @@ O `publish` foi desenhado para que um envio acidental seja difícil:
 O `init` imprime as instruções e **não instala nada**. No Windows ele imprime duas versões do `schtasks`, uma para o `cmd.exe` e outra para o PowerShell; use a do terminal onde for colar. No Linux e no macOS, use `cron`. Exemplo (cmd.exe):
 
 ```
-schtasks /Create /SC DAILY /ST 12:00 /TN "ai-usage-metrics" /TR "\"C:\caminho\node.exe\" \"C:\caminho\bin\ai-usage-metrics.mjs\" run"
+schtasks /Create /SC DAILY /ST 12:00 /TN "ai-usage-metrics" /TR "\"C:\caminho\node.exe\" \"C:\caminho\bin\ai-usage-metrics.mjs\" run --non-interactive"
 ```
 
 A tarefa roda sem terminal, então:
 
+- **mantenha o `--non-interactive`** se montar o comando à mão. O Agendador do Windows dá um console ao processo, e sem essa opção o `run` entende que há uma pessoa digitando e fica esperando a resposta de `[s/N]` para sempre (a versão 0.1.0 tinha esse defeito; a 0.1.1 corrige e o `init` já imprime o comando com a opção);
 - o `git` precisa ter credencial salva, senão o push falha (não trava esperando senha);
 - `run` sem terminal **só gera os arquivos**, a menos que você tenha definido `"autoPublish": true` **e** feito antes um `publish` manual confirmado em um terminal interativo;
 - a aprovação fica amarrada ao repositório e à branch de destino, ao nome e e-mail do autor do commit e aos pares pasta -> nome público. Se qualquer um mudar, o envio automático é bloqueado e explica como reaprovar;

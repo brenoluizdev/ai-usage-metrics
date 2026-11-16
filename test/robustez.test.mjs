@@ -326,8 +326,8 @@ test("agendamento: argumentos citados (inclusive --state-dir), % escapado no cro
   assert.doesNotMatch(comPorcento, /schtasks \/Create/);
 
   const t = instrucoesDeAgendamento({ stateDir: "/home/o'neil/estado dir", node: "/usr/bin/node", bin: "/opt/ai usage/bin.mjs" });
-  assert.match(t, /\/TR "\\"\/usr\/bin\/node\\" \\"\/opt\/ai usage\/bin\.mjs\\" \\"run\\" \\"--state-dir\\" \\"\/home\/o'neil\/estado dir\\""/);
-  assert.match(t, /0 12 \* \* \* umask 077; '\/usr\/bin\/node' '\/opt\/ai usage\/bin\.mjs' 'run' '--state-dir' '\/home\/o'\\''neil\/estado dir' >> '\/home\/o'\\''neil\/estado dir\/run\.log' 2>&1/);
+  assert.match(t, /\/TR "\\"\/usr\/bin\/node\\" \\"\/opt\/ai usage\/bin\.mjs\\" \\"run\\" \\"--non-interactive\\" \\"--state-dir\\" \\"\/home\/o'neil\/estado dir\\""/);
+  assert.match(t, /0 12 \* \* \* umask 077; '\/usr\/bin\/node' '\/opt\/ai usage\/bin\.mjs' 'run' '--non-interactive' '--state-dir' '\/home\/o'\\''neil\/estado dir' >> '\/home\/o'\\''neil\/estado dir\/run\.log' 2>&1/);
   assert.match(t, /o schtasks grava o caminho do Node usado AGORA \(\/usr\/bin\/node\)/);
 
   const cron = instrucoesDeAgendamento({ stateDir: "/x/100%", node: "/n", bin: "/b" }).split("\n").find((l) => l.includes("umask"));

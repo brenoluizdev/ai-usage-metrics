@@ -1,6 +1,6 @@
 {
   "name": "ai-usage-metrics",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mede localmente o uso das suas ferramentas de IA e publica um SVG/JSON agregado e anonimizado no seu próprio repositório. Sem servidor, sem IA no meio.",
   "type": "module",
   "license": "MIT",

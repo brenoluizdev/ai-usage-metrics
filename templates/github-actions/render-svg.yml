@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AI_USAGE_METRICS_VERSION: "0.1.0"
+  AI_USAGE_METRICS_VERSION: "0.1.1"
   THEME: auto
   TITLE: AI usage
   LANG_SVG: en

@@ -16,7 +16,7 @@ import { exigirMetricasValidas } from "./schema.mjs";
 import { IDIOMAS, TEMAS, gerarSvg } from "./svg.mjs";
 
 const COMANDOS = ["sources", "report", "export", "render", "publish", "init", "run"];
-const BOOLEANAS = ["help", "yes", "dry-run", "overwrite", "accept-public-email"];
+const BOOLEANAS = ["help", "yes", "dry-run", "overwrite", "accept-public-email", "non-interactive"];
 const BIN = fileURLToPath(new URL("../bin/ai-usage-metrics.mjs", import.meta.url));
 
 const AJUDA = `ai-usage-metrics: mede o uso das suas ferramentas de IA (100% local, só leitura, sem IA no meio).
@@ -47,6 +47,8 @@ publish:  --input <json> --yes (envia sem perguntar) --dry-run (nunca envia nem 
           --accept-public-email (sem terminal: aceita publicar um e-mail que não é noreply do GitHub)
 init:     --user <usuário GitHub> --repo <nome> --branch <nome> --public a,b --theme --lang --title --remote <url> --overwrite
 run:      em modo não interativo só envia se autoPublish for true e houver um publish manual confirmado
+          --non-interactive (nunca pergunta nada, mesmo que haja um console: use no agendador; o Agendador do Windows
+          dá um console ao processo, e sem esta opção o "run" esperaria a resposta de [s/N] para sempre)
 `;
 
 function lerArgs(argv) {
@@ -311,7 +313,7 @@ export function schtasksParaPowerShell(args) {
  * @param {{ stateDir?: string|null, configPath?: string|null, node?: string, bin?: string }} [o]
  */
 export function instrucoesDeAgendamento({ stateDir = null, configPath = null, node = process.execPath, bin = BIN } = {}) {
-  const args = ["run"];
+  const args = ["run", "--non-interactive"];
   if (stateDir) args.push("--state-dir", stateDir);
   if (configPath) args.push("--config", configPath);
   const todos = [node, bin, ...args];
@@ -400,6 +402,9 @@ async function cmdInit({ args, paths, io, out }) {
  */
 export async function main(argv, out = console.log, io = ioPadrao()) {
   const args = lerArgs(argv);
+  // O Agendador do Windows dá um console ao processo (stdin.isTTY fica verdadeiro), então o "run" agendado seguiria o fluxo
+  // manual e ficaria esperando uma resposta que ninguém vai dar. Com esta opção a ferramenta nunca pergunta.
+  if (args["non-interactive"]) io = { ...io, isTTY: false };
   const cmd = args._[0];
   if (!cmd || args.help || cmd === "help") return out(AJUDA);
   if (!COMANDOS.includes(cmd)) throw new Error(`Comando desconhecido: ${cmd}. Use --help.`);

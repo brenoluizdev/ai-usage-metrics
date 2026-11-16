@@ -99,6 +99,13 @@ test("N3b: cmd recusa & | < > ^ % ! e aspas/controle; PowerShell recusa só aspa
   assert.doesNotMatch(quebra, /Start-Process -FilePath schtasks -ArgumentList '/);
 });
 
+test("os três comandos de agendamento impressos passam --non-interactive (o Agendador dá um console ao processo)", () => {
+  const t = instrucoesDeAgendamento({ stateDir: "C:\\a b\\estado", node: "C:\\n\\node.exe", bin: "C:\\b.mjs" });
+  const linhas = t.split("\n").filter((l) => /schtasks \/Create|Start-Process -FilePath schtasks|ai-usage-metrics\.mjs|b\.mjs/.test(l));
+  assert.ok(linhas.length >= 3, "cmd, PowerShell e cron");
+  for (const l of linhas) assert.match(l, /non-interactive/, l);
+});
+
 test("N9: aspasPosix recusa \\r, \\n e \\0 e continua citando aspas simples", () => {
   for (const c of ["\r", "\n", "a\nb", "\0"]) assert.throws(() => aspasPosix(c), /quebra de linha/);
   assert.equal(aspasPosix("o'neil"), "'o'\\''neil'");

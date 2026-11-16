@@ -186,6 +186,32 @@ test("run sem terminal: só gera quando autoPublish está desligado ou falta um 
   assert.equal(commitsNoRemoto(a.remoto).length, 0);
 });
 
+test("run --non-interactive: nunca pergunta, mesmo quando o processo tem console (Agendador do Windows)", async () => {
+  const a = await ambiente({ publicos: "projeto-alfa" });
+  const home = await mkdtemp(join(tmpdir(), "ai-usage-metrics-home-"));
+  pastas.push(home);
+  await claudeFalso(home);
+
+  // Sem a opção, um console faz o "run" seguir o fluxo manual e perguntar (era o que travava a tarefa agendada).
+  const perguntas = [];
+  const comConsole = { isTTY: true, ask: async (p) => { perguntas.push(p); return "n"; } };
+  await a.cmd(["run", "--home", home], comConsole);
+  assert.equal(perguntas.length, 1, "sem --non-interactive e com console, o run pergunta");
+
+  // Com a opção, o mesmo console não pode receber nenhuma pergunta (TTY_SEM_PERGUNTA falha o teste se perguntar).
+  await a.cmd(["run", "--non-interactive", "--home", home], TTY_SEM_PERGUNTA);
+  assert.match(a.texto(), /autoPublish está desligado/);
+  assert.equal(commitsNoRemoto(a.remoto).length, 0);
+
+  // Com autoPublish ligado, mas sem publish manual confirmado: também não pergunta e não envia.
+  const cfg = JSON.parse(await readFile(a.paths.config, "utf8"));
+  cfg.autoPublish = true;
+  await writeFile(a.paths.config, JSON.stringify(cfg), "utf8");
+  await a.cmd(["run", "--non-interactive", "--home", home], TTY_SEM_PERGUNTA);
+  assert.match(a.texto(), /publish" manual confirmado/);
+  assert.equal(commitsNoRemoto(a.remoto).length, 0);
+});
+
 test("run sem terminal com autoPublish: envia só depois de um publish manual, e bloqueia nomes públicos novos", async () => {
   const a = await ambiente({ publicos: "projeto-alfa" });
   const home = await mkdtemp(join(tmpdir(), "ai-usage-metrics-home-"));
